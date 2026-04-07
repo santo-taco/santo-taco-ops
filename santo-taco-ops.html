@@ -829,7 +829,7 @@ function renderSummary(labor, weekly) {
     const downColor = isCost ? 'var(--green-dark)' : 'var(--red)';
     const arrow = diff>=0 ? '↑' : '↓';
     const color = diff>=0 ? upColor : downColor;
-    return \`<span style="color:\${color};font-weight:600;">\${arrow}</span> \${f$(prior)} prior week\`;
+    return `<span style="color:${color};font-weight:600;">${arrow}</span> ${f$(prior)} prior week`;
   }
 
   const cards = [
@@ -841,14 +841,14 @@ function renderSummary(labor, weekly) {
     {label:'Prime Cost',     value:primePct!==null?fP(primePct):'—',              sub:f$(prime,2)},
   ];
 
-  document.getElementById('summary-cards').innerHTML = cards.map(c=>\`
+  document.getElementById('summary-cards').innerHTML = cards.map(c=>`
     <div class="stat-card">
-      <div class="stat-label">\${c.label}</div>
-      <div class="stat-value">\${c.value}</div>
-      \${c.sub?\`<div class="stat-sub">\${c.sub}</div>\`:''}
-      \${c.rawSub?\`<div class="stat-sub">\${c.rawSub}</div>\`:''}
-      \${c.sub2?\`<div class="stat-sub">\${c.sub2}</div>\`:''}
-    </div>\`).join('');
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-value">${c.value}</div>
+      ${c.sub?`<div class="stat-sub">${c.sub}</div>`:''}
+      ${c.rawSub?`<div class="stat-sub">${c.rawSub}</div>`:''}
+      ${c.sub2?`<div class="stat-sub">${c.sub2}</div>`:''}
+    </div>`).join('');
 
   window._laborDays = labor.days;
   window._cogsAmt = cogsAmt;
