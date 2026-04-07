@@ -782,6 +782,7 @@ function parseMenu(rows) {
     const qty       = pN(r[COL.qty]);
 
     if (!res.sections[currentSection]) res.sections[currentSection] = [];
+    if (res.sections[currentSection].some(x=>x.name===name)) continue;
     res.sections[currentSection].push({ name, cogsPct, sellPrice, recipeCost, qty });
   }
   return res;
@@ -834,8 +835,8 @@ function renderSummary(labor, weekly) {
 
   const cards = [
     {label:'Total Sales',    value:f$(sales),                                      rawSub: wowSub(sales, lastWkSales, false)},
-    {label:'Orders/hr/day',  value:ophDay||'—',                                    sub: totalOrders>0?totalOrders+' total orders':null},
-    {label:'Avg Check',      value:avgCheck||'—',                                  sub: 'net of tax & tip'},
+    {label:'ORDERS/HR',      value:ophDay||'—',                                    sub: totalOrders>0?totalOrders+' total orders':null},
+    {label:'Avg Check',      value:avgCheck||'—'},
     {label:'Hourly Labor',   value:f$(laborAmt),                                   rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
     {label:'COGS',           value:cogsPct!==null?fP(cogsPct):'—',                sub:cogsAmt?f$(cogsAmt,2):null},
     {label:'Prime Cost',     value:primePct!==null?fP(primePct):'—',              sub:f$(prime,2)},
@@ -1505,8 +1506,8 @@ function renderExecSummary() {
       // divider
       null,
       // row 3
-      {label:'Orders/hr/day', value:ophDayE||'—',  sub:totalOrdersE>0?totalOrdersE+' total':null},
-      {label:'Avg Check',     value:avgCheckE||'—', sub:'net of tax & tip'},
+      {label:'ORDERS/HR',     value:ophDayE||'—',  sub:totalOrdersE>0?totalOrdersE+' total':null},
+      {label:'Avg Check',     value:avgCheckE||'—'},
     ];
 
     const el = document.getElementById(labelId);
