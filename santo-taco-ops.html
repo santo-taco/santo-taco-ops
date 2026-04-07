@@ -1121,21 +1121,24 @@ function renderCogs(weekly, menu) {
   // Menu breakdown from menu engineering sheet (COGS% and cost $ per item)
   const sections=menu&&menu.sections||{};
   const SKIP_SECTIONS=new Set(['Other','__SKIP__','Catering']);
-  let html='<table class="eff-table"><thead><tr><th>Item</th><th class="r">COGS %</th><th class="r">Cost $</th></tr></thead><tbody>';
+  let html='<table class="eff-table"><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">COGS %</th><th class="r">Cost $</th></tr></thead><tbody>';
   let any=false;
   Object.entries(sections).forEach(([sname,items])=>{
     if(!items||!items.length||SKIP_SECTIONS.has(sname)) return;
     any=true;
     const secCost=items.reduce((s,i)=>s+(i.recipeCost||0)*(i.qty||0),0);
     const secRev =items.reduce((s,i)=>s+(i.sellPrice||0)*(i.qty||0),0);
+    const secQty =items.reduce((s,i)=>s+(i.qty||0),0);
     const secCogs=secRev>0?secCost/secRev:null;
-    html+=`<tr class="cat-row"><td>${sname}</td><td class="r">${secCogs!==null?fP(secCogs):'—'}</td><td></td></tr>`;
+    const secAvgCost=secQty>0?secCost/secQty:null;
+    html+=`<tr class="cat-row"><td>${sname}</td><td class="r">${secQty||'—'}</td><td class="r">${secCogs!==null?fP(secCogs):'—'}</td><td class="r">${secAvgCost!==null?f$(secAvgCost,2):'—'}</td></tr>`;
     items.forEach(item=>{
       const displayName=normName(item.name);
       const costNeg=item.recipeCost!==null&&item.recipeCost<0;
       const costStyle=costNeg?'color:var(--red);font-weight:600;':'';
       html+=`<tr>
         <td>${displayName}</td>
+        <td class="r">${item.qty!==null?item.qty:'—'}</td>
         <td class="r">${item.cogsPct!==null?fP(item.cogsPct):'—'}</td>
         <td class="r" style="${costStyle}">${item.recipeCost!==null?f$(item.recipeCost,2):'—'}${costNeg?' ⚠':''}</td>
       </tr>`;
