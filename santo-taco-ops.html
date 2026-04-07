@@ -840,9 +840,9 @@ function renderSummary(labor, weekly) {
     {label:'Total Sales',    value:f$(sales),                                      rawSub: wowSub(sales, lastWkSales, false)},
     {label:'ORDERS/HR',      value:ophDay||'—',                                    sub: totalOrders>0?totalOrders+' total orders':null},
     {label:'Avg Check',      value:avgCheck||'—'},
-    {label:'Hourly Labor',   value:f$(laborAmt),                                   rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
-    {label:'COGS',           value:cogsPct!==null?fP(cogsPct):'—',                sub:cogsAmt?f$(cogsAmt,2):null},
-    {label:'Prime Cost',     value:primePct!==null?fP(primePct):'—',              sub:f$(prime,2)},
+    {label:'Hourly Labor',       value:f$(laborAmt),                                   rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
+    {label:'COGS',               value:cogsPct!==null?fP(cogsPct):'—',                sub:cogsAmt?f$(cogsAmt,2):null},
+    {label:'Total Labor Cost',   value:'—',                                            sub: '% of sales'},
   ];
 
   document.getElementById('summary-cards').innerHTML = cards.map(c=>`
@@ -1036,7 +1036,7 @@ function renderLaborDetail(labor) {
       <div class="labor-summary-sub" style="color:var(--text-light);">Prior week: —</div>
     </div>
     <div class="labor-summary-item">
-      <div class="labor-summary-label">Wage Target</div>
+      <div class="labor-summary-label">Hourly Wage Target</div>
       <div class="labor-summary-value">${wTarget?f$(wTarget,2):'—'}</div>
       ${wStatus?`<div class="labor-summary-sub ${statusCls}">${wStatus}</div>`:''}
     </div>
@@ -1048,6 +1048,10 @@ function renderLaborDetail(labor) {
     <div class="labor-summary-item">
       <div class="labor-summary-label">Hourly Labor % of Sales</div>
       <div class="labor-summary-value">${lPct!==null?fP(lPct):'—'}</div>
+    </div>
+    <div class="labor-summary-item">
+      <div class="labor-summary-label">Total Labor % of Sales</div>
+      <div class="labor-summary-value">—</div>
     </div>
   </div>`;
 
@@ -1509,8 +1513,8 @@ function renderExecSummary() {
       // divider
       null,
       // row 2
-      {label:'Hourly Labor',  value:f$(laborAmt),                        sub:laborPct?fP(laborPct)+' of sales':null},
-      {label:'Prime Cost',    value:primePct!==null?fP(primePct):'—',    sub:f$(prime,2)},
+      {label:'Hourly Labor',      value:f$(laborAmt),                     sub:laborPct?fP(laborPct)+' of sales':null},
+      {label:'Total Labor Cost',  value:'—',                              sub:'% of sales'},
       // divider
       null,
       // row 3
