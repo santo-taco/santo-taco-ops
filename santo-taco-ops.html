@@ -1109,11 +1109,15 @@ function renderCogs(weekly, menu) {
   const bevPct =total&&bevAmt?bevAmt/total:null;
 
   const menuWtdCogs = menu&&menu.weightedCogs||null;
-  const menuWtdTacos= menu&&menu.weightedCogsTagcos||null;
+  const secs = menu&&menu.sections||{};
+  const drinksItems = [...(secs['Drinks']||[]), ...(secs['Alc Drinks']||[])];
+  const dCost = drinksItems.reduce((s,i)=>s+(i.recipeCost||0)*(i.qty||0),0);
+  const dRev  = drinksItems.reduce((s,i)=>s+(i.sellPrice||0)*(i.qty||0),0);
+  const menuWtdDrinks = dRev>0 ? dCost/dRev : null;
   document.getElementById('cogs-cards').innerHTML=[
-    {label:'Total COGS',       value:weekly.cogsPct!==null?fP(weekly.cogsPct):'—', sub:f$(weekly.totalCogs,2),   prior:'Prior week: —'},
-    {label:'Wtd Avg Food COGS',value:menuWtdCogs!==null?fP(menuWtdCogs):'—',      sub:null,                       prior:'Prior week: —'},
-    {label:'Wtd Avg Taco COGS',value:menuWtdTacos!==null?fP(menuWtdTacos):'—',    sub:null,                       prior:'Prior week: —'},
+    {label:'Total COGS',         value:weekly.cogsPct!==null?fP(weekly.cogsPct):'—', sub:f$(weekly.totalCogs,2), prior:'Prior week: —'},
+    {label:'Wtd Avg Food COGS',  value:menuWtdCogs!==null?fP(menuWtdCogs):'—',       sub:null,                   prior:'Prior week: —'},
+    {label:'Wtd Avg Drinks COGS',value:menuWtdDrinks!==null?fP(menuWtdDrinks):'—',   sub:null,                   prior:'Prior week: —'},
   ].map(c=>`<div class="stat-card">
     <div class="stat-label">${c.label}</div>
     <div class="stat-value">${c.value}</div>
