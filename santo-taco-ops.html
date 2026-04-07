@@ -769,8 +769,8 @@ function parseMenu(rows) {
     if (c0up === 'CATERING') { currentSection = '__SKIP__'; continue; }
     if (currentSection === '__SKIP__') continue;
 
-    // Section header — col0 has text, col1 is empty
-    if (c0 && !(r[1]+'').trim()) { currentSection = c0; continue; }
+    // Section header — col0 has text, col1 is empty (API strips trailing cells so r[1] may be undefined)
+    if (c0 && !(r[1]||'').trim()) { currentSection = c0; continue; }
 
     // Item row — col0 empty, col1 = item name
     const name = ((r[COL.name]||'')+'').trim();
