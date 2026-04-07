@@ -1130,6 +1130,7 @@ function renderCogs(weekly, menu) {
   const sections=menu&&menu.sections||{};
   Object.entries(sections).forEach(([sname,items])=>{
     if(!items||!items.length) return;
+    if(sname==='Other') return;
     html+=`<div class="menu-section-title">${sname}</div>${colHdr2}`;
     items.forEach(item=>{
       const displayName=normName(item.name);
