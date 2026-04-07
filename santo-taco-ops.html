@@ -1129,7 +1129,7 @@ function renderCogs(weekly, menu) {
     const secCost=items.reduce((s,i)=>s+(i.recipeCost||0)*(i.qty||0),0);
     const secRev =items.reduce((s,i)=>s+(i.sellPrice||0)*(i.qty||0),0);
     const secCogs=secRev>0?secCost/secRev:null;
-    html+=`<tr class="cat-row"><td>${sname}</td><td class="r" colspan="2">${secCogs!==null?fP(secCogs):'—'}</td></tr>`;
+    html+=`<tr class="cat-row"><td>${sname}</td><td class="r">${secCogs!==null?fP(secCogs):'—'}</td><td></td></tr>`;
     items.forEach(item=>{
       const displayName=normName(item.name);
       const costNeg=item.recipeCost!==null&&item.recipeCost<0;
