@@ -1120,30 +1120,11 @@ function renderCogs(weekly, menu) {
 
   // Menu breakdown from menu engineering sheet (COGS% and cost $ per item)
   const sections=menu&&menu.sections||{};
-  const SECTION_ORDER=['Tacos','Sides','Drinks','Alc Drinks'];
   const SKIP_SECTIONS=new Set(['Other','__SKIP__','Catering']);
   let html='<table class="eff-table"><thead><tr><th>Item</th><th class="r">COGS %</th><th class="r">Cost $</th></tr></thead><tbody>';
   let any=false;
-  SECTION_ORDER.forEach(sname=>{
-    const items=sections[sname];
-    if(!items||!items.length) return;
-    any=true;
-    html+=`<tr class="cat-row"><td colspan="3">${sname}</td></tr>`;
-    items.forEach(item=>{
-      const displayName=normName(item.name);
-      const costNeg=item.recipeCost!==null&&item.recipeCost<0;
-      const costStyle=costNeg?'color:var(--red);font-weight:600;':'';
-      html+=`<tr>
-        <td>${displayName}</td>
-        <td class="r">${item.cogsPct!==null?fP(item.cogsPct):'—'}</td>
-        <td class="r" style="${costStyle}">${item.recipeCost!==null?f$(item.recipeCost,2):'—'}${costNeg?' ⚠':''}</td>
-      </tr>`;
-    });
-  });
-  // Render any sections not in the fixed order, except skipped ones
-  Object.keys(sections).filter(s=>!SECTION_ORDER.includes(s)&&!SKIP_SECTIONS.has(s)).forEach(sname=>{
-    const items=sections[sname];
-    if(!items||!items.length) return;
+  Object.entries(sections).forEach(([sname,items])=>{
+    if(!items||!items.length||SKIP_SECTIONS.has(sname)) return;
     any=true;
     html+=`<tr class="cat-row"><td colspan="3">${sname}</td></tr>`;
     items.forEach(item=>{
