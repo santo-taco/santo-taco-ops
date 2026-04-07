@@ -1116,8 +1116,8 @@ function renderCogs(weekly, menu) {
   const menuWtdDrinks = dRev>0 ? dCost/dRev : null;
   document.getElementById('cogs-cards').innerHTML=[
     {label:'Total COGS',         value:weekly.cogsPct!==null?fP(weekly.cogsPct):'—', sub:f$(weekly.totalCogs,2), prior:'Prior week: —'},
-    {label:'Wtd Avg Food COGS',  value:menuWtdCogs!==null?fP(menuWtdCogs):'—',       sub:null,                   prior:'Prior week: —'},
-    {label:'Wtd Avg Drinks COGS',value:menuWtdDrinks!==null?fP(menuWtdDrinks):'—',   sub:null,                   prior:'Prior week: —'},
+    {label:'Avg Food COGS',  value:menuWtdCogs!==null?fP(menuWtdCogs):'—',       sub:null,                   prior:'Prior week: —'},
+    {label:'Avg Drinks COGS',value:menuWtdDrinks!==null?fP(menuWtdDrinks):'—',   sub:null,                   prior:'Prior week: —'},
   ].map(c=>`<div class="stat-card">
     <div class="stat-label">${c.label}</div>
     <div class="stat-value">${c.value}</div>
