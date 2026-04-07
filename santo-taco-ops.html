@@ -391,6 +391,29 @@ body {
         <div class="exec-metrics" id="exec-usq"></div>
       </div>
     </div>
+    <div style="padding:10px 20px;border-top:1px solid var(--mint);background:var(--mint-light);display:flex;justify-content:flex-end;">
+      <button class="toggle-btn" id="exec-trends-btn" onclick="toggleExecTrends()">Show 8-week trends</button>
+    </div>
+    <div id="exec-trends-wrap" style="display:none;padding:18px 20px;border-top:1px solid var(--mint);">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div>
+          <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px;">Weekly Sales</div>
+          <div style="position:relative;height:110px;"><canvas id="exec-chart-sales"></canvas></div>
+        </div>
+        <div>
+          <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px;">Hourly Labor $</div>
+          <div style="position:relative;height:110px;"><canvas id="exec-chart-labor"></canvas></div>
+        </div>
+        <div>
+          <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px;">Total COGS $</div>
+          <div style="position:relative;height:110px;"><canvas id="exec-chart-cogs"></canvas></div>
+        </div>
+        <div>
+          <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px;">Prime Cost %</div>
+          <div style="position:relative;height:110px;"><canvas id="exec-chart-prime"></canvas></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- FLOATING LOCATION BAR -->
@@ -783,30 +806,49 @@ function renderSummary(labor, weekly) {
     if(d0&&dL) document.getElementById('week-label').textContent = fmtWeekRange(d0,dL);
   }
 
-  // Orders per hour: assume 12hr AM window (open ~11am to 4pm = 5hr), PM (4pm to close ~11pm = 7hr)
-  const amHrs=5, pmHrs=7, days7=7;
-  const amOph=am!==null?(am/days7/amHrs).toFixed(1):null;
-  const pmOph=pm!==null?(pm/days7/pmHrs).toFixed(1):null;
+  // Total orders / 7 days / 12 open hours per day
+  const totalOrders = (am||0) + (pm||0);
+  const ophDay = totalOrders > 0 ? (totalOrders / 7 / 12).toFixed(1) : null;
+  // Avg check = net sales / total orders (pre-tax, pre-tip from Toast)
+  const avgCheck = totalOrders > 0 && sales ? f$(sales / totalOrders, 2) : null;
 
-  // Avg check size = sales / orders (excl tip/tax — Toast net sales already excludes these)
-  const amCheck = am && am>0 && sales ? f$(sales * (am/(am+(pm||0))) / am, 2) : null;
-  const pmCheck = pm && pm>0 && sales ? f$(sales * ((pm||0)/(am+(pm||0))) / pm, 2) : null;
+  // Last week comparison from Weekly History (labor sheet)
+  const locLabelSummary = loc==='soho'?'SoHo':'Union Square';
+  const locHistSummary  = (raw.laborHistory||[]).filter(r=>r[2]===locLabelSummary).sort((a,b)=>a[0]<b[0]?-1:1);
+  const lastWkRow = locHistSummary.length>=2 ? locHistSummary[locHistSummary.length-2] : null;
+  const lastWkSales  = lastWkRow ? parseFloat(lastWkRow[3]) : null;
+  const lastWkLabor  = lastWkRow ? parseFloat(lastWkRow[4]) : null;
+  const lastWkOrders = null; // not stored in history yet
+  const lastWkCheck  = null;
+
+  function wowSub(current, prior, isCost) {
+    if (prior===null||current===null) return null;
+    const diff = current - prior;
+    // for cost metrics (labor, cogs): up=bad(red), down=good(green). For sales: up=good
+    const upColor   = isCost ? 'var(--red)'       : 'var(--green-dark)';
+    const downColor = isCost ? 'var(--green-dark)' : 'var(--red)';
+    const arrow = diff>=0 ? '↑' : '↓';
+    const color = diff>=0 ? upColor : downColor;
+    return \`<span style="color:\${color};font-weight:600;">\${arrow}</span> \${f$(prior)} prior week\`;
+  }
 
   const cards = [
-    {label:'Total Sales',   value:f$(sales), sub: weekly.lastWeekSales?'Prior: '+f$(weekly.lastWeekSales):null},
-    {label:'AM Orders/hr',  value:amOph!==null?amOph:'—', sub:am!==null?am+' orders · avg '+( amCheck||'—'):null},
-    {label:'PM Orders/hr',  value:pmOph!==null?pmOph:'—', sub:pm!==null?pm+' orders · avg '+(pmCheck||'—'):null},
-    {label:'Hourly Labor',  value:f$(laborAmt), sub:laborPct?fP(laborPct)+' of sales':null},
-    {label:'COGS',          value:cogsPct!==null?fP(cogsPct):'—', sub:cogsAmt?f$(cogsAmt,2):null},
-    {label:'Prime Cost',    value:primePct!==null?fP(primePct):'—', sub:f$(prime,2)},
+    {label:'Total Sales',    value:f$(sales),                                      rawSub: wowSub(sales, lastWkSales, false)},
+    {label:'Orders/hr/day',  value:ophDay||'—',                                    sub: totalOrders>0?totalOrders+' total orders':null},
+    {label:'Avg Check',      value:avgCheck||'—',                                  sub: 'net of tax & tip'},
+    {label:'Hourly Labor',   value:f$(laborAmt),                                   rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
+    {label:'COGS',           value:cogsPct!==null?fP(cogsPct):'—',                sub:cogsAmt?f$(cogsAmt,2):null},
+    {label:'Prime Cost',     value:primePct!==null?fP(primePct):'—',              sub:f$(prime,2)},
   ];
 
-  document.getElementById('summary-cards').innerHTML = cards.map(c=>`
+  document.getElementById('summary-cards').innerHTML = cards.map(c=>\`
     <div class="stat-card">
-      <div class="stat-label">${c.label}</div>
-      <div class="stat-value">${c.value}</div>
-      ${c.sub?`<div class="stat-sub">${c.sub}</div>`:''}
-    </div>`).join('');
+      <div class="stat-label">\${c.label}</div>
+      <div class="stat-value">\${c.value}</div>
+      \${c.sub?\`<div class="stat-sub">\${c.sub}</div>\`:''}
+      \${c.rawSub?\`<div class="stat-sub">\${c.rawSub}</div>\`:''}
+      \${c.sub2?\`<div class="stat-sub">\${c.sub2}</div>\`:''}
+    </div>\`).join('');
 
   window._laborDays = labor.days;
   window._cogsAmt = cogsAmt;
@@ -822,8 +864,9 @@ function renderDailyChart(days, weeklyCogsAmt) {
   const salesData = days.map(d=>d.sales||0);
   const laborData = days.map(d=>d.labor||0);
 
-  // Straight horizontal COGS reference line — same value every day (weekly total)
-  const cogsFlat = weeklyCogsAmt ? days.map(()=>weeklyCogsAmt) : null;
+  // COGS daily average reference line: weekly total ÷ 7
+  const cogsDaily = weeklyCogsAmt ? parseFloat((weeklyCogsAmt/7).toFixed(2)) : null;
+  const cogsFlat = cogsDaily ? days.map(()=>cogsDaily) : null;
 
   const datasets = [
     {
@@ -866,7 +909,26 @@ function renderDailyChart(days, weeklyCogsAmt) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { labels: { font:{family:'DMSans',size:10}, color:'#4a5e47', boxWidth:12 } },
+        legend: {
+          labels: {
+            font:{family:'DMSans',size:10}, color:'#4a5e47', boxWidth:12,
+            generateLabels: function(chart) {
+              return chart.data.datasets.map((ds, i) => {
+                const isLine = ds.type === 'line';
+                return {
+                  text: ds.label,
+                  fillStyle:   isLine ? 'transparent' : ds.backgroundColor,
+                  strokeStyle: isLine ? ds.borderColor : ds.backgroundColor,
+                  lineWidth:   isLine ? 2 : 0,
+                  lineDash:    isLine ? [5,4] : [],
+                  hidden: !chart.isDatasetVisible(i),
+                  datasetIndex: i,
+                  pointStyle: isLine ? 'line' : 'rect',
+                };
+              });
+            }
+          }
+        },
         tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${f$(c.raw,0)}` } },
         // Custom data labels: sales $ above bar, labor % inside orange section
         datalabels: false,
@@ -1046,8 +1108,8 @@ function renderCogs(weekly, menu) {
   const menuWtdTacos= menu&&menu.weightedCogsTagcos||null;
   document.getElementById('cogs-cards').innerHTML=[
     {label:'Total COGS',       value:weekly.cogsPct!==null?fP(weekly.cogsPct):'—', sub:f$(weekly.totalCogs,2),   prior:'Prior week: —'},
-    {label:'Wtd Avg Food COGS',value:menuWtdCogs!==null?fP(menuWtdCogs):'—',      sub:'weighted by revenue',     prior:'Prior week: —'},
-    {label:'Wtd Avg Taco COGS',value:menuWtdTacos!==null?fP(menuWtdTacos):'—',    sub:'tacos only',              prior:'Prior week: —'},
+    {label:'Wtd Avg Food COGS',value:menuWtdCogs!==null?fP(menuWtdCogs):'—',      sub:null,                       prior:'Prior week: —'},
+    {label:'Wtd Avg Taco COGS',value:menuWtdTacos!==null?fP(menuWtdTacos):'—',    sub:null,                       prior:'Prior week: —'},
   ].map(c=>`<div class="stat-card">
     <div class="stat-label">${c.label}</div>
     <div class="stat-value">${c.value}</div>
@@ -1147,9 +1209,11 @@ function renderEfficiency(deepDive) {
   // Helper: weighted-average efficiency across multiple ingredient keys
   function groupEff(keys) {
     let theoTotal=0, weighted=0, actSpend=0, actQtySum=0, theoQtySum=0;
+    let uom='';
     keys.forEach(k=>{
       const d=items[k];
       if(!d)return;
+      if(!uom&&d.uom) uom=d.uom;
       const eff  =d.metrics?.['Efficiency %']?.[latest]??null;
       const theo =d.metrics?.['Theoretical Qty']?.[latest]??null;
       const spend=d.metrics?.['Actual Spend ($)']?.[latest]??null;
@@ -1164,6 +1228,7 @@ function renderEfficiency(deepDive) {
       spend: actSpend||null,
       actQty: actQtySum||null,
       theoQty: theoQtySum||null,
+      uom,
     };
   }
 
@@ -1190,8 +1255,9 @@ function renderEfficiency(deepDive) {
       if(e!==null){if(e<0.80||e>1.20)pill='eff-bad';else if(e<0.90||e>1.10)pill='eff-warn';}
       const effHtml=e!==null?`<span class="eff-pill ${pill}">${fP(e)}</span>`:'—';
       const fmtQty=v=>v!==null?parseFloat(v).toFixed(2):'—';
+      const uomHtml = item.uom ? `<span style="color:var(--text-light);font-weight:400;font-size:10px;"> (${item.uom})</span>` : '';
       html+=`<tr>
-        <td>${item.label}</td>
+        <td>${item.label}${uomHtml}</td>
         <td class="r">${fmtQty(item.actQty)}</td>
         <td class="r">${fmtQty(item.theoQty)}</td>
         <td class="r">${effHtml}</td>
@@ -1262,20 +1328,33 @@ function renderTrends(deepDive) {
       }
     });
 
-    // Render price row below chart: one cell per week showing exact $ price
-    const priceEl=document.getElementById(id+'_prices');
-    if(priceEl){
-      let pr='<div style="display:flex;gap:0;margin-top:4px;">';
-      weeks.forEach((w,i)=>{
-        const v=data[i];
-        const lbl=wkLabels[i];
-        pr+=`<div style="flex:1;text-align:center;">
-          <div style="font-size:7px;color:var(--text-light);line-height:1.2;">${lbl}</div>
-          <div style="font-size:8px;color:var(--text-mid);font-variant-numeric:tabular-nums;">${v!==null?'$'+v.toFixed(2):'—'}</div>
-        </div>`;
-      });
-      pr+='</div>';
-      priceEl.innerHTML=pr;
+    // Render price row below chart aligned to data points using chart pixel positions
+    const chartRef = trendCharts[name];
+    const priceEl  = document.getElementById(id+'_prices');
+    if(priceEl && chartRef) {
+      const drawPrices = () => {
+        const meta = chartRef.getDatasetMeta(0);
+        if (!meta || !meta.data || !meta.data.length) return;
+        const canvasRect = chartRef.canvas.getBoundingClientRect();
+        const containerRect = priceEl.parentElement.getBoundingClientRect();
+        let pr = '<div style="position:relative;height:28px;margin-top:2px;">';
+        meta.data.forEach((pt, i) => {
+          const v = data[i];
+          if (v === null) return;
+          // pt.x is pixel position within canvas
+          const pxLeft = pt.x / chartRef.canvas.offsetWidth * 100;
+          pr += `<div style="position:absolute;left:${pxLeft}%;transform:translateX(-50%);text-align:center;white-space:nowrap;">
+            <div style="font-size:8px;color:var(--text-mid);font-variant-numeric:tabular-nums;font-weight:500;">$${v.toFixed(2)}</div>
+          </div>`;
+        });
+        pr += '</div>';
+        priceEl.innerHTML = pr;
+      };
+      // Draw after animation completes
+      chartRef.options.animation = { onComplete: drawPrices };
+      chartRef.update();
+      // Also draw immediately in case animation is disabled
+      setTimeout(drawPrices, 400);
     }
   });
 
@@ -1394,20 +1473,29 @@ function renderExecSummary() {
     const primePct = sales?prime/sales:null;
     const am = weekly.amOrders;
     const pm = weekly.pmOrders;
-    const amOph = am!==null?(am/days7/amHrs).toFixed(1):null;
-    const pmOph = pm!==null?(pm/days7/pmHrs).toFixed(1):null;
-    const totalOrders = (am||0)+(pm||0);
-    const amCheck = am&&am>0&&sales ? f$(sales*(am/totalOrders)/am,2) : null;
-    const pmCheck = pm&&pm>0&&sales ? f$(sales*(pm/totalOrders)/pm,2) : null;
+    const totalOrdersE = (am||0)+(pm||0);
+    const ophDayE  = totalOrdersE>0 ? (totalOrdersE/7/12).toFixed(1) : null;
+    const avgCheckE= totalOrdersE>0&&sales ? f$(sales/totalOrdersE,2) : null;
 
     // Row 1: Total Sales (with WoW arrow placeholder) | Total COGS
     // Row 2: Hourly Labor | Prime Cost
     // Row 3: AM Orders/hr | PM Orders/hr
-    const salesArrow = ''; // placeholder for WoW when historical data available
+    // Last week sales from Weekly History tab (labor sheet)
+    const locHistory = (raw.laborHistory||[]).filter(r=>r[2]===locLabel);
+    const sortedHist = locHistory.sort((a,b)=>a[0]<b[0]?-1:1);
+    const lastWeekRow = sortedHist.length>=2 ? sortedHist[sortedHist.length-2] : null;
+    const lastWeekSales = lastWeekRow ? parseFloat(lastWeekRow[3]) : null;
+    let salesSub = null;
+    if (lastWeekSales!==null && sales!==null) {
+      const diff = sales - lastWeekSales;
+      const arrow = diff>=0 ? '↑' : '↓';
+      const color = diff>=0 ? 'var(--green-dark)' : 'var(--red)';
+      salesSub = `<span style="color:${color};font-weight:600;">${arrow}</span> ${f$(lastWeekSales)} prior week`;
+    }
 
     const rows = [
       // row 1
-      {label:'Total Sales',   value:f$(sales),                           sub:salesArrow||null},
+      {label:'Total Sales',   value:f$(sales),                           rawSub:salesSub},
       {label:'Total COGS',    value:cogsPct!==null?fP(cogsPct):'—',      sub:f$(cogsAmt,2)},
       // divider
       null,
@@ -1417,8 +1505,8 @@ function renderExecSummary() {
       // divider
       null,
       // row 3
-      {label:'AM Orders/hr',  value:amOph||'—',                          sub:amCheck?'avg '+amCheck:null},
-      {label:'PM Orders/hr',  value:pmOph||'—',                          sub:pmCheck?'avg '+pmCheck:null},
+      {label:'Orders/hr/day', value:ophDayE||'—',  sub:totalOrdersE>0?totalOrdersE+' total':null},
+      {label:'Avg Check',     value:avgCheckE||'—', sub:'net of tax & tip'},
     ];
 
     const el = document.getElementById(labelId);
@@ -1428,7 +1516,7 @@ function renderExecSummary() {
         : `<div class="exec-metric">
             <div class="exec-metric-label">${m.label}</div>
             <div class="exec-metric-value">${m.value}</div>
-            ${m.sub?`<div class="exec-metric-sub">${m.sub}</div>`:''}
+            ${m.rawSub?`<div class="exec-metric-sub">${m.rawSub}</div>`:m.sub?`<div class="exec-metric-sub">${m.sub}</div>`:''}
           </div>`
     ).join('');
   }
@@ -1454,6 +1542,126 @@ function toggleDaily(){
   btn.textContent=dailyOpen?'Hide daily breakdown':'Show daily breakdown';
   if(dailyOpen&&window._laborDays) renderDailyChart(window._laborDays, window._cogsAmt);
 }
+
+// ── EXEC TRENDS ───────────────────────────────────────────────────────────────
+let execTrendsOpen = false;
+let execTrendCharts = {};
+
+function toggleExecTrends() {
+  execTrendsOpen = !execTrendsOpen;
+  const wrap = document.getElementById('exec-trends-wrap');
+  const btn  = document.getElementById('exec-trends-btn');
+  wrap.style.display = execTrendsOpen ? 'block' : 'none';
+  btn.classList.toggle('active', execTrendsOpen);
+  btn.textContent = execTrendsOpen ? 'Hide 8-week trends' : 'Show 8-week trends';
+  if (execTrendsOpen) renderExecTrends();
+}
+
+function renderExecTrends() {
+  // Destroy old charts
+  Object.values(execTrendCharts).forEach(c=>c.destroy());
+  execTrendCharts = {};
+
+  // Pull last 8 weeks from Weekly History tabs
+  const laborHist = raw.laborHistory || [];
+  const cogsHist  = raw.cogsHistory  || [];
+
+  // Get sorted unique week_start dates across both locations
+  const allWeeks = [...new Set([
+    ...laborHist.map(r=>r[0]),
+    ...cogsHist.map(r=>r[0]),
+  ])].sort().slice(-8);
+
+  if (!allWeeks.length) {
+    document.getElementById('exec-trends-wrap').innerHTML +=
+      '<div style="color:var(--text-light);font-size:12px;padding:8px 0;">No historical data yet — run the scripts for at least 2 weeks.</div>';
+    return;
+  }
+
+  const wkLabels = allWeeks.map(w=>w.slice(5)); // MM-DD
+
+  // Build datasets per location
+  const LOCS = [
+    {key:'SoHo',          color: COLORS.sales},
+    {key:'Union Square',  color: COLORS.labor},
+  ];
+
+  function makeDataset(histRows, locKey, colIdx, color) {
+    const rows = histRows.filter(r=>r[2]===locKey);
+    const byWeek = {};
+    rows.forEach(r=>{ byWeek[r[0]]=parseFloat(r[colIdx])||null; });
+    return {
+      label: locKey==='SoHo'?'SoHo':'USQ',
+      data: allWeeks.map(w=>byWeek[w]??null),
+      borderColor: color,
+      backgroundColor: color+'22',
+      tension: 0.3,
+      pointRadius: 3,
+      pointBackgroundColor: color,
+      fill: false,
+      spanGaps: true,
+    };
+  }
+
+  function makeChart(canvasId, datasets, isPct) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    execTrendCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: wkLabels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { font:{family:'DMSans',size:9}, color:'#4a5e47', boxWidth:10 } } },
+        scales: {
+          x: { ticks:{font:{family:'DMSans',size:8},color:'#7a9478'}, grid:{color:'#D2E7CD'} },
+          y: { ticks:{font:{family:'DMSans',size:8},color:'#7a9478',
+                callback: v => isPct ? (v*100).toFixed(0)+'%' : '$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},
+               grid:{color:'#D2E7CD'} }
+        }
+      }
+    });
+  }
+
+  // Labor history cols: week_start(0) week_end(1) location(2) net_sales(3) hourly_labor(4) labor_pct(5)
+  // COGS history cols:  week_start(0) week_end(1) location(2) net_sales(3) am_orders(4) pm_orders(5) total_cogs(6) cogs_pct(7)
+
+  makeChart('exec-chart-sales', [
+    makeDataset(laborHist, 'SoHo',          3, COLORS.sales),
+    makeDataset(laborHist, 'Union Square',   3, COLORS.labor),
+  ], false);
+
+  makeChart('exec-chart-labor', [
+    makeDataset(laborHist, 'SoHo',          4, COLORS.sales),
+    makeDataset(laborHist, 'Union Square',   4, COLORS.labor),
+  ], false);
+
+  makeChart('exec-chart-cogs', [
+    makeDataset(cogsHist, 'SoHo',           6, COLORS.sales),
+    makeDataset(cogsHist, 'Union Square',    6, COLORS.labor),
+  ], false);
+
+  // Prime cost % = (labor + cogs) / sales — need to combine by week
+  const primeSoho = allWeeks.map(w=>{
+    const lr = laborHist.find(r=>r[0]===w&&r[2]==='SoHo');
+    const cr = cogsHist.find(r=>r[0]===w&&r[2]==='SoHo');
+    if(!lr||!cr) return null;
+    const s=parseFloat(lr[3]),l=parseFloat(lr[4]),c=parseFloat(cr[6]);
+    return s>0?((l+c)/s):null;
+  });
+  const primeUsq = allWeeks.map(w=>{
+    const lr = laborHist.find(r=>r[0]===w&&r[2]==='Union Square');
+    const cr = cogsHist.find(r=>r[0]===w&&r[2]==='Union Square');
+    if(!lr||!cr) return null;
+    const s=parseFloat(lr[3]),l=parseFloat(lr[4]),c=parseFloat(cr[6]);
+    return s>0?((l+c)/s):null;
+  });
+
+  makeChart('exec-chart-prime', [
+    {label:'SoHo', data:primeSoho, borderColor:COLORS.sales, backgroundColor:COLORS.sales+'22', tension:0.3, pointRadius:3, pointBackgroundColor:COLORS.sales, fill:false, spanGaps:true, type:'line'},
+    {label:'USQ',  data:primeUsq,  borderColor:COLORS.labor, backgroundColor:COLORS.labor+'22', tension:0.3, pointRadius:3, pointBackgroundColor:COLORS.labor, fill:false, spanGaps:true, type:'line'},
+  ], true);
+}
+
 function toggleLaborDetail(){
   const tableEl=document.getElementById('labor-table-wrap');
   const btn=document.getElementById('labor-detail-btn');
@@ -1529,12 +1737,28 @@ async function init(){
       getRows(SHEETS.menu, usqMenuTab),
     ]);
 
+    // Fetch Weekly History tabs from labor and COGS sheets
+    let laborHistoryRows = [], cogsHistoryRows = [];
+    try {
+      const laborHistTab = laborTabs.find(t=>/weekly.history/i.test(t)||t==='Weekly History');
+      if (laborHistTab) laborHistoryRows = await getRows(SHEETS.labor, laborHistTab);
+    } catch(e) { console.log('Labor history tab not found yet:', e.message); }
+    try {
+      const cogsHistTab = cogsTabs.find(t=>/weekly.history/i.test(t)||t==='Weekly History');
+      if (cogsHistTab) cogsHistoryRows = await getRows(SHEETS.cogs, cogsHistTab);
+    } catch(e) { console.log('COGS history tab not found yet:', e.message); }
+
+    // Parse history rows (skip header row)
+    const parseHistory = rows => rows.length>1 ? rows.slice(1) : [];
+
     raw={
-      laborTabs: laborTabData,
-      weekly:    parseWeekly(weeklyRows),
-      deepDive:  parseDeepDive(deepRows),
-      menuBySoho: parseMenu(sohoMenuRows),
-      menuByUsq:  parseMenu(usqMenuRows),
+      laborTabs:    laborTabData,
+      weekly:       parseWeekly(weeklyRows),
+      deepDive:     parseDeepDive(deepRows),
+      menuBySoho:   parseMenu(sohoMenuRows),
+      menuByUsq:    parseMenu(usqMenuRows),
+      laborHistory: parseHistory(laborHistoryRows),
+      cogsHistory:  parseHistory(cogsHistoryRows),
     };
 
     renderAll();
