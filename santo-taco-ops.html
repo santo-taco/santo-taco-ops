@@ -1119,33 +1119,46 @@ function renderCogs(weekly, menu) {
   </div>`).join('');
 
   // Menu breakdown from menu engineering sheet (COGS% and cost $ per item)
-  const colHdr2 = `<div class="menu-item-row" style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);border-bottom:1px solid var(--mint);padding-bottom:5px;margin-bottom:2px;">
-    <div class="menu-item-name">Item</div>
-    <div style="display:flex;gap:20px;">
-      <div style="min-width:50px;text-align:right;">COGS %</div>
-      <div style="min-width:48px;text-align:right;">Cost $</div>
-    </div>
-  </div>`;
-  let html='';
   const sections=menu&&menu.sections||{};
-  Object.entries(sections).forEach(([sname,items])=>{
+  const SECTION_ORDER=['Tacos','Sides','Drinks','Alc Drinks'];
+  const SKIP_SECTIONS=new Set(['Other','__SKIP__','Catering']);
+  let html='<table class="eff-table"><thead><tr><th>Item</th><th class="r">COGS %</th><th class="r">Cost $</th></tr></thead><tbody>';
+  let any=false;
+  SECTION_ORDER.forEach(sname=>{
+    const items=sections[sname];
     if(!items||!items.length) return;
-    if(sname==='Other') return;
-    html+=`<div class="menu-section-title">${sname}</div>${colHdr2}`;
+    any=true;
+    html+=`<tr class="cat-row"><td colspan="3">${sname}</td></tr>`;
     items.forEach(item=>{
       const displayName=normName(item.name);
-      const costNeg = item.recipeCost!==null && item.recipeCost<0;
-      const costColor = costNeg ? 'color:var(--red);font-weight:600;' : 'color:var(--text-mid);';
-      html+=`<div class="menu-item-row">
-        <div class="menu-item-name">${displayName}</div>
-        <div style="display:flex;gap:20px;">
-          <div style="min-width:50px;text-align:right;font-variant-numeric:tabular-nums;">${item.cogsPct!==null?fP(item.cogsPct):'—'}</div>
-          <div style="min-width:48px;text-align:right;font-variant-numeric:tabular-nums;${costColor}">${item.recipeCost!==null?f$(item.recipeCost,2):'—'}${costNeg?' ⚠':''}</div>
-        </div>
-      </div>`;
+      const costNeg=item.recipeCost!==null&&item.recipeCost<0;
+      const costStyle=costNeg?'color:var(--red);font-weight:600;':'';
+      html+=`<tr>
+        <td>${displayName}</td>
+        <td class="r">${item.cogsPct!==null?fP(item.cogsPct):'—'}</td>
+        <td class="r" style="${costStyle}">${item.recipeCost!==null?f$(item.recipeCost,2):'—'}${costNeg?' ⚠':''}</td>
+      </tr>`;
     });
   });
-  document.getElementById('menu-content').innerHTML=html||'<div style="color:var(--text-light);font-size:12px;">No menu data.</div>';
+  // Render any sections not in the fixed order, except skipped ones
+  Object.keys(sections).filter(s=>!SECTION_ORDER.includes(s)&&!SKIP_SECTIONS.has(s)).forEach(sname=>{
+    const items=sections[sname];
+    if(!items||!items.length) return;
+    any=true;
+    html+=`<tr class="cat-row"><td colspan="3">${sname}</td></tr>`;
+    items.forEach(item=>{
+      const displayName=normName(item.name);
+      const costNeg=item.recipeCost!==null&&item.recipeCost<0;
+      const costStyle=costNeg?'color:var(--red);font-weight:600;':'';
+      html+=`<tr>
+        <td>${displayName}</td>
+        <td class="r">${item.cogsPct!==null?fP(item.cogsPct):'—'}</td>
+        <td class="r" style="${costStyle}">${item.recipeCost!==null?f$(item.recipeCost,2):'—'}${costNeg?' ⚠':''}</td>
+      </tr>`;
+    });
+  });
+  html+='</tbody></table>';
+  document.getElementById('menu-content').innerHTML=any?html:'<div style="color:var(--text-light);font-size:12px;">No menu data.</div>';
 }
 
 // ── RENDER EFFICIENCY ─────────────────────────────────────────────────────────
