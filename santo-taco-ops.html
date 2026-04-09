@@ -1298,9 +1298,11 @@ function renderTrends(deepDive) {
   const weeks=deepDive.weeks.slice(-12);
   const wkLabels=weeks.map(w=>w.slice(5));
 
-  const available=TREND_ITEMS_ORDER.filter(name=>
-    items[name]&&items[name].metrics['Cost / Unit ($)']
-  );
+  const SOHO_EXCLUDED_TRENDS=new Set(['Shrimp 21/25']);
+  const available=TREND_ITEMS_ORDER.filter(name=>{
+    if(loc==='soho'&&SOHO_EXCLUDED_TRENDS.has(name)) return false;
+    return items[name]&&items[name].metrics['Cost / Unit ($)'];
+  });
 
   if (!available.length) {
     document.getElementById('trends-content').innerHTML='<div style="color:var(--text-light);font-size:12px;">No trend data yet — more weeks needed.</div>';
