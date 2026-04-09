@@ -395,7 +395,7 @@ body {
       </div>
     </div>
     <div style="padding:10px 20px;border-top:1px solid var(--mint);background:var(--mint-light);display:flex;justify-content:flex-end;">
-      <button class="toggle-btn" id="exec-trends-btn" onclick="toggleExecTrends()">Show 8-week trends</button>
+      <button class="toggle-btn" id="exec-trends-btn" onclick="toggleExecTrends()">Show 12-week trends</button>
     </div>
     <div id="exec-trends-wrap" style="display:none;padding:18px 20px;border-top:1px solid var(--mint);">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
@@ -408,12 +408,8 @@ body {
           <div style="position:relative;height:110px;"><canvas id="exec-chart-labor"></canvas></div>
         </div>
         <div>
-          <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px;">Total COGS $</div>
+          <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px;">Total F&B COGS $</div>
           <div style="position:relative;height:110px;"><canvas id="exec-chart-cogs"></canvas></div>
-        </div>
-        <div>
-          <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:8px;">Prime Cost %</div>
-          <div style="position:relative;height:110px;"><canvas id="exec-chart-prime"></canvas></div>
         </div>
       </div>
     </div>
@@ -604,7 +600,7 @@ function parseLaborTab(rows) {
 
     // Headcount rows (role names, followed by 7 daily headcounts + week total)
     if (inHeadcount && c0) {
-      if (c0up.includes('TOTAL HOURLY') || c0up.includes('WAGE TARGET') || c0up.includes('WEEKLY SALES') || c0up.includes('HOURLY LABOR') || c0up.includes('SALES TARGET')) {
+      if (c0up.includes('TOTAL HOURLY') || c0up.includes('WAGE TARGET') || c0up.includes('WEEKLY SALES') || c0up.includes('HOURLY LABOR') || c0up.includes('SALES TARGET') || c0up.includes('TOTAL LABOR')) {
         inHeadcount = false;
       } else {
         const daily = [r[1],r[2],r[3],r[4],r[5],r[6],r[7]].map(v=>pN(v));
@@ -615,11 +611,12 @@ function parseLaborTab(rows) {
     }
 
     // Summary rows
-    if (c0up.includes('TOTAL HOURLY WAGES'))       { res.weekLabor  = res.weekLabor  || pN(r[1]); }
-    if (c0up.includes('WAGE TARGET'))               { res.wageTarget = pN(r[1]); res.wageStatus  = (r[2]||'').toString().trim(); }
-    if (c0up === 'WEEKLY SALES')                    { res.weekSales  = res.weekSales  || pN(r[1]); }
-    if (c0up.includes('SALES TARGET'))              { res.salesTarget= pN(r[1]); res.salesStatus = (r[2]||'').toString().trim(); }
+    if (c0up.includes('TOTAL HOURLY WAGES'))       { res.weekLabor    = res.weekLabor  || pN(r[1]); }
+    if (c0up.includes('WAGE TARGET'))               { res.wageTarget   = pN(r[1]); res.wageStatus  = (r[2]||'').toString().trim(); }
+    if (c0up === 'WEEKLY SALES')                    { res.weekSales    = res.weekSales  || pN(r[1]); }
+    if (c0up.includes('SALES TARGET'))              { res.salesTarget  = pN(r[1]); res.salesStatus = (r[2]||'').toString().trim(); }
     if (c0up.includes('HOURLY LABOR % OF SALES'))   { const p=pN(r[1]); if(p&&!res.laborPct) res.laborPct=p/100; }
+    if (c0up === 'TOTAL LABOR')                     { res.totalLabor   = pN(r[1]); }
   }
   return res;
 }
@@ -657,6 +654,8 @@ function parseWeekly(rows) {
       // col1 value may be string like '$54,694.32' or '32.9%' or plain number
       if (c0==='AM ORDERS')             o.amOrders  = pN(r[1]);
       if (c0==='PM ORDERS')             o.pmOrders  = pN(r[1]);
+      if (c0==='AM HOURS')              o.amHours   = pN(r[1]);
+      if (c0==='PM HOURS')              o.pmHours   = pN(r[1]);
       if (c0==='NET SALES')             o.netSales  = pN(r[1]);
       if (c0.includes('TOTAL COGS'))    o.totalCogs = pN(r[1]);
       if (c0==='COGS %')                o.cogsPct   = pP(r[1]);
@@ -798,7 +797,8 @@ function renderSummary(labor, weekly) {
   const cogsAmt  = weekly.totalCogs;
   const cogsPct  = weekly.cogsPct || (sales&&cogsAmt?cogsAmt/sales:null);
   const laborPct = labor.laborPct || (sales&&laborAmt?laborAmt/sales:null);
-  const prime    = (laborAmt||0)+(cogsAmt||0);
+  const totalLaborAmt = labor.totalLabor || laborAmt;
+  const prime    = (totalLaborAmt||0)+(cogsAmt||0);
   const primePct = sales?prime/sales:null;
   const margin   = primePct?1-primePct:null;
 
@@ -810,9 +810,9 @@ function renderSummary(labor, weekly) {
     if(d0&&dL) document.getElementById('week-label').textContent = fmtWeekRange(d0,dL);
   }
 
-  // Total orders / 7 days / 12 open hours per day
   const totalOrders = (am||0) + (pm||0);
-  const ophDay = totalOrders > 0 ? (totalOrders / 7 / 12).toFixed(1) : null;
+  const totalHours  = (weekly.amHours||0) + (weekly.pmHours||0);
+  const ophDay = totalOrders > 0 && totalHours > 0 ? (totalOrders / totalHours).toFixed(1) : null;
   // Avg check = net sales / total orders (pre-tax, pre-tip from Toast)
   const avgCheck = totalOrders > 0 && sales ? f$(sales / totalOrders, 2) : null;
 
@@ -841,7 +841,7 @@ function renderSummary(labor, weekly) {
     {label:'ORDERS/HR',      value:ophDay||'—',                                    sub: totalOrders>0?totalOrders+' total orders':null},
     {label:'Avg Check',      value:avgCheck||'—'},
     {label:'Hourly Labor',       value:f$(laborAmt),                                   rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
-    {label:'COGS',               value:cogsPct!==null?fP(cogsPct):'—',                sub:cogsAmt?f$(cogsAmt,2):null},
+    {label:'Total F&B COGS',      value:cogsPct!==null?fP(cogsPct):'—',                sub:cogsAmt?f$(cogsAmt,2):null},
     {label:'Total Labor Cost',   value:'—',                                            sub: '% of sales'},
   ];
 
@@ -1119,7 +1119,7 @@ function renderCogs(weekly, menu) {
   const dRev  = drinksItems.reduce((s,i)=>s+(i.sellPrice||0)*(i.qty||0),0);
   const menuWtdDrinks = dRev>0 ? dCost/dRev : null;
   document.getElementById('cogs-cards').innerHTML=[
-    {label:'Total COGS',         value:weekly.cogsPct!==null?fP(weekly.cogsPct):'—', sub:f$(weekly.totalCogs,2), prior:'Prior week: —'},
+    {label:'Total F&B COGS',      value:weekly.cogsPct!==null?fP(weekly.cogsPct):'—', sub:f$(weekly.totalCogs,2), prior:'Prior week: —'},
     {label:'Avg Food COGS',  value:menuWtdCogs!==null?fP(menuWtdCogs):'—',       sub:null,                   prior:'Prior week: —'},
     {label:'Avg Drinks COGS',value:menuWtdDrinks!==null?fP(menuWtdDrinks):'—',   sub:null,                   prior:'Prior week: —'},
   ].map(c=>`<div class="stat-card">
@@ -1179,10 +1179,10 @@ const EFF_GROUPS = {
     { label:'Topo Chico',             cat:'Beverages', keys:['Topo Chico'] },
   ],
   usq: [
-    { label:'Carnitas Taco',          cat:'Food',      keys:['Pork Bellies','pork spare ribs 3# dn (usf'] },
+    { label:'Carnitas Taco',          cat:'Food',      keys:['Recipes: Carnitas'] },
     { label:'Zucchini Taco',          cat:'Food',      keys:['Zucchini'] },
-    { label:'Trompo / Carne Asada',   cat:'Food',      keys:['Beef Flap [Soft] Meat #185A [Choice]','Beef Strip Loin #180 0X1 [Choice]'] },
-    { label:'Pollo Taco',             cat:'Food',      keys:['Chicken Thighs Boneless Skinless Fresh'] },
+    { label:'Trompo / Carne Asada',   cat:'Food',      keys:['Subrecipe: NYStripLoin sliced','Subrecipe: Sirloin sliced'] },
+    { label:'Pollo Taco',             cat:'Food',      keys:['Subrecipe: Pollo clean'] },
     { label:'Shrimp Taco',            cat:'Food',      keys:['Shrimp 21/25'] },
     { label:'Mushroom Taco',          cat:'Food',      keys:['Shiitake Mushrooms','Cremini Mushrooms'] },
     { label:'Avocado',                cat:'Food',      keys:['Avocado Hass'] },
@@ -1260,6 +1260,7 @@ function renderEfficiency(deepDive) {
   ['Food','Beverages'].forEach(cat=>{
     const rows=bycat[cat];
     if(!rows||!rows.length) return;
+    rows.sort((a,b)=>(b.spend||0)-(a.spend||0));
     any=true;
     html+=`<tr class="cat-row"><td colspan="5">${cat}</td></tr>`;
     rows.forEach(item=>{
@@ -1423,8 +1424,8 @@ function renderFlags(labor, weekly, deepDive, menu) {
   if(labor.wageStatus&&up(labor.wageStatus).includes('OVER')) add('warning','📊',`Labor wages <strong>over target</strong>: ${labor.wageStatus}`);
   if(labor.salesStatus&&up(labor.salesStatus).includes('UNDER')) add('warning','📊',`Sales <strong>under target</strong>: ${labor.salesStatus}`);
 
-  // Total COGS > 30%
-  if(weekly.cogsPct&&weekly.cogsPct>0.30) add('warning','💰',`Total COGS is <strong>${fP(weekly.cogsPct)}</strong> — above 30% threshold.`);
+  // Total F&B COGS > 30%
+  if(weekly.cogsPct&&weekly.cogsPct>0.30) add('warning','💰',`Total F&B COGS is <strong>${fP(weekly.cogsPct)}</strong> — above 30% threshold.`);
 
   // Ingredient cost WoW changes — whitelist items only
   const wl=EFF_WHITELIST[loc]||[];
@@ -1482,12 +1483,14 @@ function renderExecSummary() {
     const cogsAmt  = weekly.totalCogs;
     const cogsPct  = weekly.cogsPct || (sales&&cogsAmt?cogsAmt/sales:null);
     const laborPct = labor.laborPct || (sales&&laborAmt?laborAmt/sales:null);
-    const prime    = (laborAmt||0)+(cogsAmt||0);
+    const totalLaborAmt = labor.totalLabor || laborAmt;
+    const prime    = (totalLaborAmt||0)+(cogsAmt||0);
     const primePct = sales?prime/sales:null;
     const am = weekly.amOrders;
     const pm = weekly.pmOrders;
     const totalOrdersE = (am||0)+(pm||0);
-    const ophDayE  = totalOrdersE>0 ? (totalOrdersE/7/12).toFixed(1) : null;
+    const totalHoursE = (weekly.amHours||0) + (weekly.pmHours||0);
+    const ophDayE  = totalOrdersE>0 && totalHoursE>0 ? (totalOrdersE/totalHoursE).toFixed(1) : null;
     const avgCheckE= totalOrdersE>0&&sales ? f$(sales/totalOrdersE,2) : null;
 
     // Row 1: Total Sales (with WoW arrow placeholder) | Total COGS
@@ -1509,7 +1512,7 @@ function renderExecSummary() {
     const rows = [
       // row 1
       {label:'Total Sales',   value:f$(sales),                           rawSub:salesSub},
-      {label:'Total COGS',    value:cogsPct!==null?fP(cogsPct):'—',      sub:f$(cogsAmt,2)},
+      {label:'Total F&B COGS',  value:cogsPct!==null?fP(cogsPct):'—',      sub:f$(cogsAmt,2)},
       // divider
       null,
       // row 2
@@ -1566,7 +1569,7 @@ function toggleExecTrends() {
   const btn  = document.getElementById('exec-trends-btn');
   wrap.style.display = execTrendsOpen ? 'block' : 'none';
   btn.classList.toggle('active', execTrendsOpen);
-  btn.textContent = execTrendsOpen ? 'Hide 8-week trends' : 'Show 8-week trends';
+  btn.textContent = execTrendsOpen ? 'Hide 12-week trends' : 'Show 12-week trends';
   if (execTrendsOpen) renderExecTrends();
 }
 
@@ -1583,7 +1586,7 @@ function renderExecTrends() {
   const allWeeks = [...new Set([
     ...laborHist.map(r=>r[0]),
     ...cogsHist.map(r=>r[0]),
-  ])].sort().slice(-8);
+  ])].sort().slice(-12);
 
   if (!allWeeks.length) {
     document.getElementById('exec-trends-wrap').innerHTML +=
@@ -1652,27 +1655,6 @@ function renderExecTrends() {
     makeDataset(cogsHist, 'SoHo',           6, COLORS.sales),
     makeDataset(cogsHist, 'Union Square',    6, COLORS.labor),
   ], false);
-
-  // Prime cost % = (labor + cogs) / sales — need to combine by week
-  const primeSoho = allWeeks.map(w=>{
-    const lr = laborHist.find(r=>r[0]===w&&r[2]==='SoHo');
-    const cr = cogsHist.find(r=>r[0]===w&&r[2]==='SoHo');
-    if(!lr||!cr) return null;
-    const s=parseFloat(lr[3]),l=parseFloat(lr[4]),c=parseFloat(cr[6]);
-    return s>0?((l+c)/s):null;
-  });
-  const primeUsq = allWeeks.map(w=>{
-    const lr = laborHist.find(r=>r[0]===w&&r[2]==='Union Square');
-    const cr = cogsHist.find(r=>r[0]===w&&r[2]==='Union Square');
-    if(!lr||!cr) return null;
-    const s=parseFloat(lr[3]),l=parseFloat(lr[4]),c=parseFloat(cr[6]);
-    return s>0?((l+c)/s):null;
-  });
-
-  makeChart('exec-chart-prime', [
-    {label:'SoHo', data:primeSoho, borderColor:COLORS.sales, backgroundColor:COLORS.sales+'22', tension:0.3, pointRadius:3, pointBackgroundColor:COLORS.sales, fill:false, spanGaps:true, type:'line'},
-    {label:'USQ',  data:primeUsq,  borderColor:COLORS.labor, backgroundColor:COLORS.labor+'22', tension:0.3, pointRadius:3, pointBackgroundColor:COLORS.labor, fill:false, spanGaps:true, type:'line'},
-  ], true);
 }
 
 function toggleLaborDetail(){
