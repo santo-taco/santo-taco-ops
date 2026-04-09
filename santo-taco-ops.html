@@ -92,6 +92,7 @@ body {
   background: var(--mint-light);
 }
 .section-title { font-family: 'HelveticaNeue', 'Helvetica Neue', sans-serif; font-size: 16px; color: var(--bark); }
+.section-date  { font-size: 10px; color: var(--text-light); letter-spacing: 0.05em; margin-top: 2px; }
 .section-body  { padding: 18px; }
 
 /* STAT GRID */
@@ -427,7 +428,7 @@ body {
   <!-- S1: WEEKLY SUMMARY -->
   <div class="section">
     <div class="section-header">
-      <div class="section-title">Weekly Summary</div>
+      <div><div class="section-title">Weekly Summary</div><div class="section-date" id="summary-date"></div></div>
       <button class="toggle-btn" id="daily-btn" onclick="toggleDaily()">Show daily breakdown</button>
     </div>
     <div class="section-body">
@@ -442,7 +443,7 @@ body {
   <!-- S1b: LABOR DETAIL -->
   <div class="section">
     <div class="section-header">
-      <div class="section-title">Labor</div>
+      <div><div class="section-title">Labor</div><div class="section-date" id="labor-date"></div></div>
       <button class="toggle-btn" id="labor-detail-btn" onclick="toggleLaborDetail()">Show labor detail</button>
     </div>
     <div class="section-body" style="padding:0;">
@@ -455,7 +456,7 @@ body {
   <!-- S2: COGS DETAIL -->
   <div class="section">
     <div class="section-header">
-      <div class="section-title">COGS</div>
+      <div><div class="section-title">COGS</div><div class="section-date" id="cogs-date"></div></div>
       <button class="toggle-btn" id="menu-btn" onclick="toggleMenu()">Show menu breakdown</button>
     </div>
     <div class="section-body">
@@ -467,7 +468,7 @@ body {
   <!-- S4: TRENDS -->
   <div class="section">
     <div class="section-header">
-      <div class="section-title">Ingredient Pricing Trends</div>
+      <div><div class="section-title">Ingredient Pricing Trends</div><div class="section-date" id="trends-date"></div></div>
       <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">LAST 12 WEEKS · COST / UNIT</div>
     </div>
     <div class="section-body">
@@ -478,7 +479,7 @@ body {
 
   <!-- S3: EFFICIENCY -->
   <div class="section">
-    <div class="section-header"><div class="section-title">Efficiency</div></div>
+    <div class="section-header"><div><div class="section-title">Efficiency</div><div class="section-date" id="eff-date"></div></div></div>
     <div class="section-body" style="padding:0;">
       <div id="eff-wrap"><div class="loading" style="padding:22px 18px;"><div class="spinner"></div>Loading…</div></div>
     </div>
@@ -1703,6 +1704,23 @@ function renderAll(){
   renderEfficiency(deepDive);
   renderTrends(deepDive);
   renderFlags(labor,weekly,deepDive,menu);
+
+  // Populate section date ranges
+  if(labor.days && labor.days.length){
+    const d0=labor.days[0].date, dL=labor.days[labor.days.length-1].date;
+    const wr=fmtWeekRange(d0,dL);
+    ['summary-date','labor-date','cogs-date'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.textContent=wr;
+    });
+  }
+  if(deepDive.weeks && deepDive.weeks.length){
+    const ws=deepDive.weeks;
+    const effEl=document.getElementById('eff-date');
+    if(effEl) effEl.textContent='Week of '+fmtDate(ws[ws.length-1]);
+    const trEl=document.getElementById('trends-date');
+    const tStart=ws.length>12?ws[ws.length-12]:ws[0];
+    if(trEl) trEl.textContent=fmtDate(tStart)+' – '+fmtDate(ws[ws.length-1]);
+  }
 
   document.getElementById('last-run').textContent='Loaded '+new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'})+' ET';
 }
