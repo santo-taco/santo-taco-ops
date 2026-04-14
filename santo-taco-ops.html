@@ -440,7 +440,17 @@ body {
   </div>
 
 
-  <!-- S1b: LABOR DETAIL -->
+  <!-- S1b: DISCOUNTS -->
+  <div class="section" id="discounts-section">
+    <div class="section-header">
+      <div><div class="section-title">Discounts & Comps</div><div class="section-date" id="discounts-date"></div></div>
+    </div>
+    <div class="section-body" style="padding:0;">
+      <div id="discounts-wrap"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- S1c: LABOR DETAIL -->
   <div class="section">
     <div class="section-header">
       <div><div class="section-title">Labor</div><div class="section-date" id="labor-date"></div></div>
@@ -629,7 +639,7 @@ function parseWeekly(rows) {
   // SLIDE 3 block: Metric in col0, value in col1 (may have $ prefix)
   // SLIDE 4 block: col0=taco group, col1=item name, col2=uom, col3=beg, col4=purch, col5=end, col6=actual qty, col7=theo qty, col8=eff%
   // SLIDE 5 block: col0=item, col1=uom, col2=beg, col3=purch, col4=end, col5=actual, col6=theo, col7=eff%
-  const make = () => ({ netSales:null, totalCogs:null, cogsPct:null, amOrders:null, pmOrders:null, foodGroups:{}, beverages:[] });
+  const make = () => ({ netSales:null, totalCogs:null, cogsPct:null, amOrders:null, pmOrders:null, totalOrders:null, discounts:[], foodGroups:{}, beverages:[] });
   const out = { soho: make(), usq: make() };
 
   let cur = null;
@@ -655,13 +665,23 @@ function parseWeekly(rows) {
 
     if (slide === 3) {
       // col1 value may be string like '$54,694.32' or '32.9%' or plain number
-      if (c0==='AM ORDERS')             o.amOrders  = pN(r[1]);
-      if (c0==='PM ORDERS')             o.pmOrders  = pN(r[1]);
-      if (c0==='AM HOURS')              o.amHours   = pN(r[1]);
-      if (c0==='PM HOURS')              o.pmHours   = pN(r[1]);
-      if (c0==='NET SALES')             o.netSales  = pN(r[1]);
-      if (c0.includes('TOTAL COGS'))    o.totalCogs = pN(r[1]);
-      if (c0==='COGS %')                o.cogsPct   = pP(r[1]);
+      if (c0==='LUNCH ORDERS')          o.amOrders    = pN(r[1]);
+      if (c0==='DINNER ORDERS')         o.pmOrders    = pN(r[1]);
+      if (c0==='AM ORDERS')             o.amOrders    = pN(r[1]);  // backwards compat
+      if (c0==='PM ORDERS')             o.pmOrders    = pN(r[1]);  // backwards compat
+      if (c0==='TOTAL ORDERS')          o.totalOrders = pN(r[1]);
+      if (c0==='LUNCH HOURS')           o.amHours     = pN(r[1]);
+      if (c0==='DINNER HOURS')          o.pmHours     = pN(r[1]);
+      if (c0==='AM HOURS')              o.amHours     = pN(r[1]);  // backwards compat
+      if (c0==='PM HOURS')              o.pmHours     = pN(r[1]);  // backwards compat
+      if (c0==='NET SALES')             o.netSales    = pN(r[1]);
+      if (c0.includes('TOTAL COGS'))    o.totalCogs   = pN(r[1]);
+      if (c0==='COGS %')                o.cogsPct     = pP(r[1]);
+      if (c0.startsWith('DISCOUNT: ')) {
+        const name = r[0].slice('DISCOUNT: '.length).trim();
+        const amt  = pN(r[1]);
+        if (name && amt !== null) o.discounts.push({ name, amt });
+      }
     }
 
     if (slide === 4) {
@@ -813,10 +833,10 @@ function renderSummary(labor, weekly) {
     if(d0&&dL) document.getElementById('week-label').textContent = fmtWeekRange(d0,dL);
   }
 
-  const totalOrders = (am||0) + (pm||0);
+  const totalOrders = weekly.totalOrders || ((am||0) + (pm||0));
   const totalHours  = (weekly.amHours||0) + (weekly.pmHours||0);
   const ophDay = totalOrders > 0 && totalHours > 0 ? (totalOrders / totalHours).toFixed(1) : null;
-  // Avg check = net sales / total orders (pre-tax, pre-tip from Toast)
+  // Avg check = net sales / total orders (pre-tax, pre-tip from Toast — matches Toast Service Mode Summary)
   const avgCheck = totalOrders > 0 && sales ? f$(sales / totalOrders, 2) : null;
 
   // Last week comparison from Weekly History (labor sheet)
@@ -1104,6 +1124,27 @@ const NAME_MAP = {
 function normName(raw) {
   const key = (raw||'').toLowerCase().trim();
   return NAME_MAP[key] || raw;
+}
+
+// ── RENDER DISCOUNTS ─────────────────────────────────────────────────────────
+function renderDiscounts(weekly) {
+  const wrap = document.getElementById('discounts-wrap');
+  if (!wrap) return;
+  const discs = weekly.discounts || [];
+  if (!discs.length) {
+    wrap.innerHTML = '<div style="color:var(--text-light);font-size:12px;padding:14px 18px;">No discount data — run cogs_deep_dive.py to populate.</div>';
+    return;
+  }
+  const total = discs.reduce((s, d) => s + d.amt, 0);
+  let html = '<table class="eff-table"><thead><tr><th>Discount / Comp</th><th class="r">Amount</th><th class="r">% of Sales</th></tr></thead><tbody>';
+  const sales = weekly.netSales || 0;
+  discs.forEach(d => {
+    const pct = sales > 0 ? fP(d.amt / sales) : '—';
+    html += `<tr><td>${d.name}</td><td class="r">${f$(d.amt, 2)}</td><td class="r">${pct}</td></tr>`;
+  });
+  html += `<tr class="cat-row"><td>Total Discounts</td><td class="r">${f$(total, 2)}</td><td class="r">${sales > 0 ? fP(total / sales) : '—'}</td></tr>`;
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
 }
 
 // ── RENDER COGS ───────────────────────────────────────────────────────────────
@@ -1413,9 +1454,9 @@ function renderFlags(labor, weekly, deepDive, menu) {
   // Data staleness
   if(latest){const d=new Date(latest),now=new Date();if((now-d)/(1000*60*60*24)>14)add('warning','🕐',`Data may be stale — latest week in sheet is <strong>${latest}</strong>.`);}
 
-  // AM/PM orders missing
-  if(weekly.amOrders===0||weekly.amOrders===null) add('error','⚠','AM orders are <strong>zero</strong> — possible Toast sync issue.');
-  if(weekly.pmOrders===0||weekly.pmOrders===null) add('error','⚠','PM orders are <strong>zero</strong> — possible Toast sync issue.');
+  // Lunch/Dinner orders missing
+  if(weekly.amOrders===0||weekly.amOrders===null) add('error','⚠','Lunch orders are <strong>zero</strong> — possible Toast sync issue.');
+  if(weekly.pmOrders===0||weekly.pmOrders===null) add('error','⚠','Dinner orders are <strong>zero</strong> — possible Toast sync issue.');
 
   // Days with zero sales or zero labor
   if(labor.days){
@@ -1493,14 +1534,14 @@ function renderExecSummary() {
     const primePct = sales?prime/sales:null;
     const am = weekly.amOrders;
     const pm = weekly.pmOrders;
-    const totalOrdersE = (am||0)+(pm||0);
+    const totalOrdersE = weekly.totalOrders || ((am||0)+(pm||0));
     const totalHoursE = (weekly.amHours||0) + (weekly.pmHours||0);
     const ophDayE  = totalOrdersE>0 && totalHoursE>0 ? (totalOrdersE/totalHoursE).toFixed(1) : null;
     const avgCheckE= totalOrdersE>0&&sales ? f$(sales/totalOrdersE,2) : null;
 
     // Row 1: Total Sales (with WoW arrow placeholder) | Total COGS
     // Row 2: Hourly Labor | Prime Cost
-    // Row 3: AM Orders/hr | PM Orders/hr
+    // Row 3: Lunch Orders/hr | Dinner Orders/hr
     // Last week sales from Weekly History tab (labor sheet)
     const locHistory = (raw.laborHistory||[]).filter(r=>r[2]===locLabel);
     const sortedHist = locHistory.sort((a,b)=>a[0]<b[0]?-1:1);
@@ -1526,7 +1567,7 @@ function renderExecSummary() {
       // divider
       null,
       // row 3
-      {label:'ORDERS/HR',     value:ophDayE||'—',  sub:totalOrdersE>0?totalOrdersE+' total':null},
+      {label:'ORDERS/HR',     value:ophDayE||'—',  sub:totalOrdersE>0?totalOrdersE+' total orders':null},
       {label:'Avg Check',     value:avgCheckE||'—'},
     ];
 
@@ -1644,7 +1685,7 @@ function renderExecTrends() {
   }
 
   // Labor history cols: week_start(0) week_end(1) location(2) net_sales(3) hourly_labor(4) labor_pct(5)
-  // COGS history cols:  week_start(0) week_end(1) location(2) net_sales(3) am_orders(4) pm_orders(5) total_cogs(6) cogs_pct(7)
+  // COGS history cols:  week_start(0) week_end(1) location(2) net_sales(3) am_orders(4) pm_orders(5) total_orders(6) total_cogs(7) cogs_pct(8)
 
   makeChart('exec-chart-sales', [
     makeDataset(laborHist, 'SoHo',          3, COLORS.sales),
@@ -1657,8 +1698,8 @@ function renderExecTrends() {
   ], false);
 
   makeChart('exec-chart-cogs', [
-    makeDataset(cogsHist, 'SoHo',           6, COLORS.sales),
-    makeDataset(cogsHist, 'Union Square',    6, COLORS.labor),
+    makeDataset(cogsHist, 'SoHo',           7, COLORS.sales),
+    makeDataset(cogsHist, 'Union Square',   7, COLORS.labor),
   ], false);
 }
 
@@ -1695,12 +1736,14 @@ function renderAll(){
 
   const labor=parseLaborTab(laborRows);
 
-  // Merge AM/PM from weekly into labor if missing
-  if(labor.amOrders===null) labor.amOrders=weekly.amOrders;
-  if(labor.pmOrders===null) labor.pmOrders=weekly.pmOrders;
+  // Merge AM/PM/total from weekly into labor if missing
+  if(labor.amOrders===null)    labor.amOrders    = weekly.amOrders;
+  if(labor.pmOrders===null)    labor.pmOrders    = weekly.pmOrders;
+  if(labor.totalOrders===null) labor.totalOrders = weekly.totalOrders;
 
   renderExecSummary();
   renderSummary(labor,weekly);
+  renderDiscounts(weekly);
   renderLaborDetail(labor);
   renderCogs(weekly, menu);
   renderEfficiency(deepDive);
