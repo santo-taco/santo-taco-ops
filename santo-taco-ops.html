@@ -479,11 +479,12 @@ body {
   <div class="section">
     <div class="section-header">
       <div><div class="section-title">Ingredient Pricing Trends</div><div class="section-date" id="trends-date"></div></div>
-      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">LAST 12 WEEKS · COST / UNIT</div>
+      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">LAST 12 WEEKS · COST / UNIT · AVT SOURCE</div>
     </div>
     <div class="section-body">
       <div id="trends-content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
       <div id="spikes-content"></div>
+      <div id="ingredient-spend"></div>
     </div>
   </div>
 
@@ -495,7 +496,29 @@ body {
     </div>
   </div>
 
-  <!-- S5: FLAGS -->
+  <!-- S6: KPI TARGETS -->
+  <div class="section">
+    <div class="section-header">
+      <div><div class="section-title">KPI Targets vs Actuals</div><div class="section-date" id="kpi-date"></div></div>
+      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">SOURCE: R365 P&L vs BUDGET 2026</div>
+    </div>
+    <div class="section-body">
+      <div id="kpi-content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- S7: MAINTENANCE LOG -->
+  <div class="section">
+    <div class="section-header">
+      <div><div class="section-title">Maintenance Log</div><div class="section-date" id="maint-date"></div></div>
+      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">OPEN &amp; IN PROGRESS ITEMS · LIVE FROM SHEETS</div>
+    </div>
+    <div class="section-body">
+      <div id="maint-content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- S8: FLAGS -->
   <div class="flags-section">
     <div class="flags-header">
       <div class="flags-title">Manager Flags</div>
@@ -505,9 +528,9 @@ body {
   </div>
 
   <div class="footer">
-    <a href="https://docs.google.com/spreadsheets/d/1qEh_bnAX9JzvZNKPiUUQt-5Kc6Pk2K6SxRzz9e4gcnk" target="_blank">↗ Labor Sheet</a>
+    <a href="https://docs.google.com/spreadsheets/d/12EaY_KF_RqH4yijuYZTegWuhD_Y4tAWqwiabU-CBb-k" target="_blank">↗ Labor Sheet</a>
     <a href="https://docs.google.com/spreadsheets/d/1FmjJqxwxZz4FmosAqC7H2L7S-tTczjzWnUQURaLN7rg" target="_blank">↗ COGS Sheet</a>
-    <a href="https://docs.google.com/spreadsheets/d/1dyxWXbuGfCawxUYgO8aJicc34JbDWPp9eTfo1Zh6UaU" target="_blank">↗ Menu Sheet</a>
+    <a href="https://docs.google.com/spreadsheets/d/1dyxWXbuGfCawxUYgO8aJicc34JbDWPp9eTvo1Zh6UaU" target="_blank">↗ Menu Sheet</a>
   </div>
 </div>
 
@@ -515,11 +538,23 @@ body {
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 const API_KEY  = 'AIzaSyBfRG-cpHyrBkjN3JSD4psoJz1l3ooiF90';
 const SHEETS   = {
-  labor: '1qEh_bnAX9JzvZNKPiUUQt-5Kc6Pk2K6SxRzz9e4gcnk',
+  labor: '12EaY_KF_RqH4yijuYZTegWuhD_Y4tAWqwiabU-CBb-k',
   cogs:  '1FmjJqxwxZz4FmosAqC7H2L7S-tTczjzWnUQURaLN7rg',
-  menu:  '1dyxWXbuGfCawxUYgO8aJicc34JbDWPp9eTfo1Zh6UaU',
+  menu:  '1dyxWXbuGfCawxUYgO8aJicc34JbDWPp9eTvo1Zh6UaU',
+  // P&L Data is written by pl_report.py to the labor sheet (per location tab)
+  // and a shared COGS sheet for USQ. Both use the same P&L Data tab name.
 };
+
+// Maintenance log sheet IDs (read live via Sheets API)
+const MAINT_SHEETS = {
+  soho: '1_3snZN6qgLXs5K4zVetEbfhFPiCGHawxgF5T0VeZr2I',
+  usq:  '11nz8WrkTPpNqPAWFYy_n3w70Kiu8r6VtVVmo1zBnNgo',
+};
+
 const COLORS = { sales:'#5a9e50', labor:'#d68910', cogs:'#c0392b' };
+
+// Ingredient unit cost trend charts — AVT source
+// Standardized display names, both locations
 const TREND_ITEMS_ORDER = [
   'Subrecipe: NYStripLoin sliced',
   'Subrecipe: Sirloin sliced',
@@ -527,14 +562,42 @@ const TREND_ITEMS_ORDER = [
   'Recipes: Carnitas',
   'Shrimp 21/25',
   'Avocado Hass',
+  'Tuna Saku block frozen',
 ];
 const TREND_ITEMS = {
-  'Subrecipe: NYStripLoin sliced':'NY Strip',
-  'Subrecipe: Sirloin sliced':    'Sirloin',
-  'Subrecipe: Pollo clean':       'Pollo',
-  'Recipes: Carnitas':            'Carnitas',
-  'Shrimp 21/25':                 'Shrimp',
-  'Avocado Hass':                 'Avocado',
+  'Subrecipe: NYStripLoin sliced': 'NY Strip',
+  'Subrecipe: Sirloin sliced':     'Sirloin',
+  'Subrecipe: Pollo clean':        'Chicken',
+  'Recipes: Carnitas':             'Carnitas',
+  'Shrimp 21/25':                  'Shrimp',
+  'Avocado Hass':                  'Avocado',
+  'Tuna Saku block frozen':        'Tuna Saku',
+};
+
+// USQ uses different AVT ingredient names for the same items
+const TREND_ITEMS_USQ = {
+  'Subrecipe: NYStripLoin sliced': 'Beef Strip Loin #180 0X1 [Choice]',
+  'Subrecipe: Sirloin sliced':     'Beef Flap [Soft] Meat #185A [Choice]',
+  'Subrecipe: Pollo clean':        'Chicken Thighs Boneless Skinless Fresh',
+  'Recipes: Carnitas':             'Recipes: Carnitas',
+  'Shrimp 21/25':                  'Shrimp 21/25',
+  'Avocado Hass':                  'Avocado Hass',
+  'Tuna Saku block frozen':        'Tuna Saku block frozen',
+};
+
+// KPI targets by location and quarter — hardcoded from Budget 2026
+// HARDCODED: % of net sales. Update each quarter.
+const KPI_TARGETS = {
+  soho: {
+    2: { cogs:0.315, labor:0.271, ebitda:0.217 },
+    3: { cogs:0.315, labor:0.270, ebitda:0.217 },
+    4: { cogs:0.298, labor:0.345, ebitda:0.103 },
+  },
+  usq: {
+    2: { cogs:0.317, labor:0.315, ebitda:0.172 },
+    3: { cogs:0.315, labor:0.315, ebitda:0.173 },
+    4: { cogs:0.297, labor:0.315, ebitda:0.188 },
+  },
 };
 const CAT_MAP = [
   ['protein',  ['carnitas','strip','sirloin','pollo','chicken','beef','pork','shrimp']],
@@ -639,7 +702,12 @@ function parseWeekly(rows) {
   // SLIDE 3 block: Metric in col0, value in col1 (may have $ prefix)
   // SLIDE 4 block: col0=taco group, col1=item name, col2=uom, col3=beg, col4=purch, col5=end, col6=actual qty, col7=theo qty, col8=eff%
   // SLIDE 5 block: col0=item, col1=uom, col2=beg, col3=purch, col4=end, col5=actual, col6=theo, col7=eff%
-  const make = () => ({ netSales:null, totalCogs:null, cogsPct:null, amOrders:null, pmOrders:null, totalOrders:null, discounts:[], foodGroups:{}, beverages:[] });
+  const make = () => ({
+    netSales:null, totalCogs:null, cogsPct:null,
+    foodCogs:null, bevCogs:null, paperGoods:null,
+    amOrders:null, pmOrders:null, totalOrders:null,
+    discounts:[], foodGroups:{}, beverages:[]
+  });
   const out = { soho: make(), usq: make() };
 
   let cur = null;
@@ -813,17 +881,69 @@ function parseMenu(rows) {
   return res;
 }
 
+function parsePLData(rows) {
+  // Parses the 'P&L Data' tab written by pl_report.py
+  // Row format: col0=metric label, col1=this week $, col2=this week %, col3=prior week $, col4=prior week %
+  const res = {
+    netSales:null, foodCogs:null, bevCogs:null, paperGoods:null,
+    totalCogs:null, cogsPct:null,
+    seafoodCost:null, beefCost:null, poultryCost:null, porkCost:null,
+    liquorCost:null, beerCost:null,
+    supportCrew:null, serviceCrew:null, shiftSupervisor:null,
+    totalHourly:null, mgmtWages:null, commissaryLabor:null,
+    benefitsTaxes:null, totalLabor:null, laborPct:null,
+    ebitda:null, ebitdaPct:null,
+    // prior week
+    priorNetSales:null, priorTotalCogs:null, priorTotalLabor:null, priorEbitda:null,
+    priorBeefCost:null, priorPoultryCost:null, priorPorkCost:null,
+    priorSeafoodCost:null, priorLiquorCost:null, priorBeerCost:null,
+  };
+  if (!rows || !rows.length) return res;
+
+  for (const r of rows) {
+    const label = ((r[0]||'')+'').trim().toUpperCase();
+    const curr  = pN(r[1]);
+    const prior = pN(r[3]);
+    const currPct = pP(r[2]);
+
+    if (label==='NET SALES')                           { res.netSales=curr; res.priorNetSales=prior; }
+    if (label==='FOOD COST')                           { res.foodCogs=curr; }
+    if (label==='TOTAL BEV COST')                      { res.bevCogs=curr; }
+    if (label==='PAPER GOODS')                         { res.paperGoods=curr; }
+    if (label==='TOTAL COGS')                          { res.totalCogs=curr; res.priorTotalCogs=prior; res.cogsPct=currPct; }
+    if (label==='SEAFOOD')                             { res.seafoodCost=curr; res.priorSeafoodCost=prior; }
+    if (label==='BEEF')                                { res.beefCost=curr; res.priorBeefCost=prior; }
+    if (label==='POULTRY')                             { res.poultryCost=curr; res.priorPoultryCost=prior; }
+    if (label==='PORK')                                { res.porkCost=curr; res.priorPorkCost=prior; }
+    if (label==='LIQUOR')                              { res.liquorCost=curr; res.priorLiquorCost=prior; }
+    if (label==='BEER')                                { res.beerCost=curr; res.priorBeerCost=prior; }
+    if (label==='SUPPORT CREW (PREPCOOKS)')            { res.supportCrew=curr; }
+    if (label==='SERVICE CREW (TAQUERO+TORTILLA+FOH)') { res.serviceCrew=curr; }
+    if (label==='SHIFT SUPERVISOR')                    { res.shiftSupervisor=curr; }
+    if (label==='TOTAL HOURLY STAFF')                  { res.totalHourly=curr; }
+    if (label.startsWith('MANAGEMENT WAGES'))          { res.mgmtWages=curr; }
+    if (label.startsWith('COMMISSARY LABOR'))          { res.commissaryLabor=curr; }
+    if (label==='BENEFITS & TAXES')                    { res.benefitsTaxes=curr; }
+    if (label==='TOTAL LABOR (CALCULATED)')            { res.totalLabor=curr; res.priorTotalLabor=prior; }
+    if (label==='4-WALL EBITDA')                       { res.ebitda=curr; res.priorEbitda=prior; res.ebitdaPct=currPct; }
+  }
+
+  // Derive laborPct
+  if (res.totalLabor && res.netSales) res.laborPct = res.totalLabor / res.netSales;
+
+  return res;
+}
+
 // ── RENDER SUMMARY ────────────────────────────────────────────────────────────
-function renderSummary(labor, weekly) {
-  const sales    = labor.weekSales || weekly.netSales;
-  const laborAmt = labor.weekLabor;
-  const cogsAmt  = weekly.totalCogs;
-  const cogsPct  = weekly.cogsPct || (sales&&cogsAmt?cogsAmt/sales:null);
-  const laborPct = labor.laborPct || (sales&&laborAmt?laborAmt/sales:null);
-  const totalLaborAmt = labor.totalLabor || laborAmt;
-  const prime    = (totalLaborAmt||0)+(cogsAmt||0);
-  const primePct = sales?prime/sales:null;
-  const margin   = primePct?1-primePct:null;
+function renderSummary(labor, weekly, pl) {
+  const sales     = pl.netSales || labor.weekSales || weekly.netSales;
+  const laborAmt  = pl.totalHourly || labor.weekLabor;
+  const totalLaborAmt = pl.totalLabor || labor.totalLabor || laborAmt;
+  const cogsAmt   = pl.totalCogs || weekly.totalCogs;
+  const cogsPct   = pl.cogsPct || (sales&&cogsAmt?cogsAmt/sales:null);
+  const laborPct  = pl.laborPct || labor.laborPct || (sales&&laborAmt?laborAmt/sales:null);
+  const prime     = (totalLaborAmt||0)+(cogsAmt||0);
+  const primePct  = sales?prime/sales:null;
 
   const am = weekly.amOrders;
   const pm = weekly.pmOrders;
@@ -839,19 +959,16 @@ function renderSummary(labor, weekly) {
   // Avg check = net sales / total orders (pre-tax, pre-tip from Toast — matches Toast Service Mode Summary)
   const avgCheck = totalOrders > 0 && sales ? f$(sales / totalOrders, 2) : null;
 
-  // Last week comparison from Weekly History (labor sheet)
+  // Prior week from P&L History
   const locLabelSummary = loc==='soho'?'SoHo':'Union Square';
   const locHistSummary  = (raw.laborHistory||[]).filter(r=>r[2]===locLabelSummary).sort((a,b)=>a[0]<b[0]?-1:1);
   const lastWkRow = locHistSummary.length>=2 ? locHistSummary[locHistSummary.length-2] : null;
   const lastWkSales  = lastWkRow ? parseFloat(lastWkRow[3]) : null;
-  const lastWkLabor  = lastWkRow ? parseFloat(lastWkRow[4]) : null;
-  const lastWkOrders = null; // not stored in history yet
-  const lastWkCheck  = null;
+  const lastWkLabor  = pl.priorTotalHourly || (lastWkRow ? parseFloat(lastWkRow[4]) : null);
 
   function wowSub(current, prior, isCost) {
     if (prior===null||current===null) return null;
     const diff = current - prior;
-    // for cost metrics (labor, cogs): up=bad(red), down=good(green). For sales: up=good
     const upColor   = isCost ? 'var(--red)'       : 'var(--green-dark)';
     const downColor = isCost ? 'var(--green-dark)' : 'var(--red)';
     const arrow = diff>=0 ? '↑' : '↓';
@@ -860,12 +977,12 @@ function renderSummary(labor, weekly) {
   }
 
   const cards = [
-    {label:'Total Sales',    value:f$(sales),                                      rawSub: wowSub(sales, lastWkSales, false)},
-    {label:'ORDERS/HR',      value:ophDay||'—',                                    sub: totalOrders>0?totalOrders+' total orders':null},
-    {label:'Avg Check',      value:avgCheck||'—'},
-    {label:'Hourly Labor',       value:f$(laborAmt),                                   rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
-    {label:'Total F&B COGS',      value:cogsPct!==null?fP(cogsPct):'—',                sub:cogsAmt?f$(cogsAmt,2):null},
-    {label:'Total Labor Cost',   value:'—',                                            sub: '% of sales'},
+    {label:'Total Sales',      value:f$(sales),                           rawSub: wowSub(sales, lastWkSales, false)},
+    {label:'Orders / hr',      value:ophDay||'—',                         sub: totalOrders>0?totalOrders+' total orders':null},
+    {label:'Avg Check',        value:avgCheck||'—'},
+    {label:'Hourly Labor',     value:f$(laborAmt),                        rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
+    {label:'Total Labor Cost', value:totalLaborAmt?f$(totalLaborAmt):'—', sub: totalLaborAmt&&sales?fP(totalLaborAmt/sales)+' of sales':'Source: R365 P&L'},
+    {label:'Total COGS',       value:cogsPct!==null?fP(cogsPct):'—',      sub:cogsAmt?f$(cogsAmt,2):null},
   ];
 
   document.getElementById('summary-cards').innerHTML = cards.map(c=>`
@@ -1148,29 +1265,27 @@ function renderDiscounts(weekly) {
 }
 
 // ── RENDER COGS ───────────────────────────────────────────────────────────────
-function renderCogs(weekly, menu) {
-  let foodAmt=0, bevAmt=0;
-  Object.values(weekly.foodGroups||{}).forEach(g=>foodAmt+=(g.actual||0));
-  (weekly.beverages||[]).forEach(b=>bevAmt+=(b.actual||0));
-  const total=weekly.totalCogs||(foodAmt+bevAmt)||null;
-  const foodPct=total&&foodAmt?foodAmt/total:null;
-  const bevPct =total&&bevAmt?bevAmt/total:null;
+function renderCogs(weekly, menu, pl) {
+  const sales    = pl.netSales || weekly.netSales;
+  const foodCogs = pl.foodCogs;
+  const bevCogs  = pl.bevCogs;
+  const paper    = pl.paperGoods;
+  const total    = pl.totalCogs;
+  const cogsPct  = pl.cogsPct || (total&&sales?total/sales:null);
+  const foodPct  = foodCogs&&sales ? foodCogs/sales : null;
+  const bevPct   = bevCogs&&sales  ? bevCogs/sales  : null;
+  const paperPct = paper&&sales    ? paper/sales     : null;
 
-  const menuWtdCogs = menu&&menu.weightedCogs||null;
-  const secs = menu&&menu.sections||{};
-  const drinksItems = [...(secs['Drinks']||[]), ...(secs['Alc Drinks']||[])];
-  const dCost = drinksItems.reduce((s,i)=>s+(i.recipeCost||0)*(i.qty||0),0);
-  const dRev  = drinksItems.reduce((s,i)=>s+(i.sellPrice||0)*(i.qty||0),0);
-  const menuWtdDrinks = dRev>0 ? dCost/dRev : null;
   document.getElementById('cogs-cards').innerHTML=[
-    {label:'Total F&B COGS',      value:weekly.cogsPct!==null?fP(weekly.cogsPct):'—', sub:f$(weekly.totalCogs,2), prior:'Prior week: —'},
-    {label:'Avg Food COGS',  value:menuWtdCogs!==null?fP(menuWtdCogs):'—',       sub:null,                   prior:'Prior week: —'},
-    {label:'Avg Drinks COGS',value:menuWtdDrinks!==null?fP(menuWtdDrinks):'—',   sub:null,                   prior:'Prior week: —'},
+    {label:'Food COGS',    value:foodPct!==null?fP(foodPct):'—',  sub:foodCogs?f$(foodCogs,2):null},
+    {label:'Bev COGS',     value:bevPct!==null?fP(bevPct):'—',    sub:bevCogs?f$(bevCogs,2):null},
+    {label:'Paper Goods',  value:paperPct!==null?fP(paperPct):'—',sub:paper?f$(paper,2):null},
+    {label:'Total COGS',   value:cogsPct!==null?fP(cogsPct):'—',  sub:total?f$(total,2):null},
   ].map(c=>`<div class="stat-card">
     <div class="stat-label">${c.label}</div>
     <div class="stat-value">${c.value}</div>
     ${c.sub?`<div class="stat-sub">${c.sub}</div>`:''}
-    <div class="stat-sub" style="color:var(--text-light);font-size:9px;">${c.prior}</div>
+    <div class="stat-sub" style="color:var(--text-light);font-size:9px;">Source: R365 P&L</div>
   </div>`).join('');
 
   // Menu breakdown from menu engineering sheet (COGS% and cost $ per item)
@@ -1208,40 +1323,39 @@ function renderCogs(weekly, menu) {
 // more ingredient keys to look up in the deep dive (combined for multi-ingredient groups).
 const EFF_GROUPS = {
   soho: [
-    { label:'Carnitas Taco',          cat:'Food',      keys:['Recipes: Carnitas'] },
-    { label:'Zucchini Taco',          cat:'Food',      keys:['Zucchini'] },
-    { label:'Trompo / Carne Asada',   cat:'Food',      keys:['Subrecipe: NYStripLoin sliced','Subrecipe: Sirloin sliced'] },
-    { label:'Pollo Taco',             cat:'Food',      keys:['Subrecipe: Pollo clean'] },
-    { label:'Mushroom Taco',          cat:'Food',      keys:['Shiitake Mushrooms','Cremini Mushrooms'] },
-    { label:'Avocado',                cat:'Food',      keys:['Avocado Hass'] },
-    { label:'Masa',                   cat:'Food',      keys:['Masa'] },
-    { label:'Agua Magica',            cat:'Beverages', keys:['Agua Magica'] },
-    { label:'Modelo',                 cat:'Beverages', keys:['Modelo'] },
-    { label:'SANTO Water Bottle',     cat:'Beverages', keys:['Santo Taco Water Still'] },
-    { label:'Diet Coke',              cat:'Beverages', keys:['Diet Coke'] },
-    { label:'Mexican Coke',           cat:'Beverages', keys:['Mexican Coke'] },
-    { label:'Topo Chico',             cat:'Beverages', keys:['Topo Chico'] },
+    { label:'Carnitas',          cat:'Food',      keys:['Recipes: Carnitas'] },
+    { label:'Zucchini Taco',     cat:'Food',      keys:['Zucchini'] },
+    { label:'NY Strip',          cat:'Food',      keys:['Subrecipe: NYStripLoin sliced'] },
+    { label:'Sirloin',           cat:'Food',      keys:['Subrecipe: Sirloin sliced'] },
+    { label:'Chicken',           cat:'Food',      keys:['Subrecipe: Pollo clean'] },
+    { label:'Mushroom Taco',     cat:'Food',      keys:['Shiitake Mushrooms','Cremini Mushrooms'] },
+    { label:'Avocado',           cat:'Food',      keys:['Avocado Hass'] },
+    { label:'Tuna Saku',         cat:'Food',      keys:['Tuna Saku block frozen'] },
+    { label:'SANTO Water',       cat:'Beverages', keys:['Santo Taco Water Still'] },
+    { label:'Diet Coke',         cat:'Beverages', keys:['Diet Coke'] },
+    { label:'Mexican Coke',      cat:'Beverages', keys:['Mexican Coke'] },
+    { label:'Topo Chico',        cat:'Beverages', keys:['Topo Chico'] },
   ],
   usq: [
-    { label:'Carnitas Taco',          cat:'Food',      keys:['Recipes: Carnitas'] },
-    { label:'Zucchini Taco',          cat:'Food',      keys:['Zucchini'] },
-    { label:'Trompo / Carne Asada',   cat:'Food',      keys:['Subrecipe: NYStripLoin sliced','Subrecipe: Sirloin sliced'] },
-    { label:'Pollo Taco',             cat:'Food',      keys:['Subrecipe: Pollo clean'] },
-    { label:'Shrimp Taco',            cat:'Food',      keys:['Shrimp 21/25'] },
-    { label:'Mushroom Taco',          cat:'Food',      keys:['Shiitake Mushrooms','Cremini Mushrooms'] },
-    { label:'Avocado',                cat:'Food',      keys:['Avocado Hass'] },
-    { label:'Masa',                   cat:'Food',      keys:['Masa'] },
-    { label:'Modelo Negra Keg',       cat:'Beverages', keys:['Modelo Negra Keg'] },
-    { label:'Coronita',               cat:'Beverages', keys:['Coronita'] },
-    { label:'Modelito',               cat:'Beverages', keys:['Modelito'] },
-    { label:'Modelo Especial Keg',    cat:'Beverages', keys:['Modelo Especial Keg'] },
-    { label:'Pacifico Clara Keg',     cat:'Beverages', keys:['Pacifico Clara Keg'] },
-    { label:'Agua Magica',            cat:'Beverages', keys:['Agua Magica'] },
-    { label:'Tequila Dobel',          cat:'Beverages', keys:['Tequila Dobel'] },
-    { label:'SANTO Water Bottle',     cat:'Beverages', keys:['Santo Taco Water Still'] },
-    { label:'Diet Coke',              cat:'Beverages', keys:['Diet Coke'] },
-    { label:'Mexican Coke',           cat:'Beverages', keys:['Mexican Coke'] },
-    { label:'Topo Chico',             cat:'Beverages', keys:['Topo Chico'] },
+    { label:'Carnitas',          cat:'Food',      keys:['Recipes: Carnitas'] },
+    { label:'Zucchini Taco',     cat:'Food',      keys:['Zucchini'] },
+    { label:'NY Strip',          cat:'Food',      keys:['Beef Strip Loin #180 0X1 [Choice]'] },
+    { label:'Sirloin',           cat:'Food',      keys:['Beef Flap [Soft] Meat #185A [Choice]'] },
+    { label:'Chicken',           cat:'Food',      keys:['Chicken Thighs Boneless Skinless Fresh'] },
+    { label:'Shrimp',            cat:'Food',      keys:['Shrimp 21/25'] },
+    { label:'Mushroom Taco',     cat:'Food',      keys:['Shiitake Mushrooms','Cremini Mushrooms'] },
+    { label:'Avocado',           cat:'Food',      keys:['Avocado Hass'] },
+    { label:'Tuna Saku',         cat:'Food',      keys:['Tuna Saku block frozen'] },
+    { label:'Modelo Negra Keg',  cat:'Beverages', keys:['Modelo Negra Keg'] },
+    { label:'Coronita',          cat:'Beverages', keys:['Coronita'] },
+    { label:'Modelito',          cat:'Beverages', keys:['Modelito'] },
+    { label:'Modelo Especial',   cat:'Beverages', keys:['Modelo Especial Keg'] },
+    { label:'Pacifico Clara',    cat:'Beverages', keys:['Pacifico Clara Keg'] },
+    { label:'Tequila Dobel',     cat:'Beverages', keys:['Tequila Dobel'] },
+    { label:'SANTO Water',       cat:'Beverages', keys:['Santo Taco Water Still'] },
+    { label:'Diet Coke',         cat:'Beverages', keys:['Diet Coke'] },
+    { label:'Mexican Coke',      cat:'Beverages', keys:['Mexican Coke'] },
+    { label:'Topo Chico',        cat:'Beverages', keys:['Topo Chico'] },
   ],
 };
 
@@ -1330,7 +1444,7 @@ function renderEfficiency(deepDive) {
 }
 
 // ── RENDER TRENDS ─────────────────────────────────────────────────────────────
-function renderTrends(deepDive) {
+function renderTrends(deepDive, pl) {
   Object.values(trendCharts).forEach(c=>c.destroy());
   trendCharts={};
 
@@ -1339,23 +1453,31 @@ function renderTrends(deepDive) {
   const weeks=deepDive.weeks.slice(-12);
   const wkLabels=weeks.map(w=>w.slice(5));
 
-  const SOHO_EXCLUDED_TRENDS=new Set(['Shrimp 21/25']);
-  const available=TREND_ITEMS_ORDER.filter(name=>{
-    if(loc==='soho'&&SOHO_EXCLUDED_TRENDS.has(name)) return false;
-    return items[name]&&items[name].metrics['Cost / Unit ($)'];
+  // For USQ, map standardized keys to actual AVT ingredient names
+  const getItemKey = (stdKey) => {
+    if (loc==='usq' && TREND_ITEMS_USQ[stdKey]) return TREND_ITEMS_USQ[stdKey];
+    return stdKey;
+  };
+
+  const available=TREND_ITEMS_ORDER.filter(stdKey=>{
+    if(loc==='soho'&&stdKey==='Shrimp 21/25') return false;
+    const key=getItemKey(stdKey);
+    return items[key]&&items[key].metrics['Cost / Unit ($)'];
   });
 
   if (!available.length) {
     document.getElementById('trends-content').innerHTML='<div style="color:var(--text-light);font-size:12px;">No trend data yet — more weeks needed.</div>';
     document.getElementById('spikes-content').innerHTML='';
+    document.getElementById('ingredient-spend').innerHTML='';
     return;
   }
 
   let html='<div class="trends-grid">';
-  available.forEach(name=>{
-    const id='tc_'+name.replace(/[^a-z0-9]/gi,'_');
-    const uom=items[name]?.uom||'';
-    const label=TREND_ITEMS[name];
+  available.forEach(stdKey=>{
+    const key=getItemKey(stdKey);
+    const id='tc_'+stdKey.replace(/[^a-z0-9]/gi,'_');
+    const uom=items[key]?.uom||'';
+    const label=TREND_ITEMS[stdKey];
     html+=`<div class="trend-card">
       <div class="trend-card-title">${label}<span style="font-weight:400;color:var(--text-light);margin-left:6px;font-size:8px;text-transform:none;letter-spacing:0;">${uom}</span></div>
       <div class="trend-chart-wrap"><canvas id="${id}"></canvas></div>
@@ -1365,13 +1487,14 @@ function renderTrends(deepDive) {
   html+='</div>';
   document.getElementById('trends-content').innerHTML=html;
 
-  available.forEach(name=>{
-    const metric=items[name].metrics['Cost / Unit ($)']||{};
+  available.forEach(stdKey=>{
+    const key=getItemKey(stdKey);
+    const metric=items[key].metrics['Cost / Unit ($)']||{};
     const data=weeks.map(w=>metric[w]??null);
-    const id='tc_'+name.replace(/[^a-z0-9]/gi,'_');
+    const id='tc_'+stdKey.replace(/[^a-z0-9]/gi,'_');
     const canvas=document.getElementById(id);
     if(!canvas)return;
-    trendCharts[name]=new Chart(canvas.getContext('2d'),{
+    trendCharts[stdKey]=new Chart(canvas.getContext('2d'),{
       type:'line',
       data:{labels:wkLabels,datasets:[{
         data, borderColor:COLORS.sales, backgroundColor:COLORS.sales+'18',
@@ -1388,20 +1511,16 @@ function renderTrends(deepDive) {
       }
     });
 
-    // Render price row below chart aligned to data points using chart pixel positions
-    const chartRef = trendCharts[name];
+    const chartRef = trendCharts[stdKey];
     const priceEl  = document.getElementById(id+'_prices');
     if(priceEl && chartRef) {
       const drawPrices = () => {
         const meta = chartRef.getDatasetMeta(0);
         if (!meta || !meta.data || !meta.data.length) return;
-        const canvasRect = chartRef.canvas.getBoundingClientRect();
-        const containerRect = priceEl.parentElement.getBoundingClientRect();
         let pr = '<div style="position:relative;height:28px;margin-top:2px;">';
         meta.data.forEach((pt, i) => {
           const v = data[i];
           if (v === null) return;
-          // pt.x is pixel position within canvas
           const pxLeft = pt.x / chartRef.canvas.offsetWidth * 100;
           pr += `<div style="position:absolute;left:${pxLeft}%;transform:translateX(-50%);text-align:center;white-space:nowrap;">
             <div style="font-size:8px;color:var(--text-mid);font-variant-numeric:tabular-nums;font-weight:500;">$${v.toFixed(2)}</div>
@@ -1410,25 +1529,24 @@ function renderTrends(deepDive) {
         pr += '</div>';
         priceEl.innerHTML = pr;
       };
-      // Draw after animation completes
       chartRef.options.animation = { onComplete: drawPrices };
       chartRef.update();
-      // Also draw immediately in case animation is disabled
       setTimeout(drawPrices, 400);
     }
   });
 
-  // Spikes
+  // Spikes from unit cost trends
   const spikes=[];
-  available.forEach(name=>{
-    const m=items[name].metrics['Cost / Unit ($)']||{};
+  available.forEach(stdKey=>{
+    const key=getItemKey(stdKey);
+    const m=items[key].metrics['Cost / Unit ($)']||{};
     const wks=Object.keys(m).sort();
     if(wks.length<2)return;
     const vL=m[wks[wks.length-1]],vP=m[wks[wks.length-2]];
-    if(vL&&vP&&vP!==0){const c=(vL-vP)/vP;if(Math.abs(c)>0.10)spikes.push({label:TREND_ITEMS[name]||name,prev:vP,curr:vL,chg:c});}
+    if(vL&&vP&&vP!==0){const c=(vL-vP)/vP;if(Math.abs(c)>0.10)spikes.push({label:TREND_ITEMS[stdKey]||stdKey,prev:vP,curr:vL,chg:c});}
   });
 
-  let sHtml=`<div class="spikes-label">Price Spike Flags (&gt;10% WoW)</div>`;
+  let sHtml=`<div class="spikes-label">Unit cost spikes (&gt;10% WoW)</div>`;
   if(spikes.length){
     spikes.forEach(s=>{
       const cls=s.chg>0?'error':'info';
@@ -1436,13 +1554,181 @@ function renderTrends(deepDive) {
       sHtml+=`<div class="flag-item ${cls}"><div class="flag-icon">${icon}</div><div class="flag-text"><strong>${s.label}</strong> — ${f$(s.prev,2)} → ${f$(s.curr,2)} (${s.chg>0?'+':''}${(s.chg*100).toFixed(1)}%)</div></div>`;
     });
   } else {
-    sHtml+='<div style="font-size:12px;color:var(--green-dark);">No price spikes this week.</div>';
+    sHtml+='<div style="font-size:12px;color:var(--green-dark);">No unit cost spikes this week.</div>';
   }
   document.getElementById('spikes-content').innerHTML=sHtml;
+
+  // Category spend table from P&L
+  const cats = [
+    { key:'beefCost',     prior:'priorBeefCost',    label:'Beef' },
+    { key:'poultryCost',  prior:'priorPoultryCost', label:'Poultry' },
+    { key:'porkCost',     prior:'priorPorkCost',    label:'Pork' },
+    { key:'seafoodCost',  prior:'priorSeafoodCost', label:'Seafood' },
+    { key:'liquorCost',   prior:'priorLiquorCost',  label:'Liquor' },
+    { key:'beerCost',     prior:'priorBeerCost',    label:'Beer' },
+  ];
+  const ns = pl.netSales || 1;
+  let tHtml=`<div class="spikes-label" style="margin-top:16px;">Category spend — R365 P&L</div>
+  <table class="eff-table"><thead><tr>
+    <th>Category</th><th class="r">This week $</th><th class="r">% of sales</th><th class="r">Prior week $</th><th class="r">WoW</th>
+  </tr></thead><tbody>`;
+  cats.forEach(({key,prior,label})=>{
+    const curr=pl[key], priorVal=pl[prior];
+    if(curr===null&&priorVal===null){tHtml+=`<tr><td>${label}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`;return;}
+    const pct=curr&&ns?curr/ns:null;
+    let wow='—', wowCls='';
+    if(curr!==null&&priorVal!==null&&priorVal!==0){
+      const chg=(curr-priorVal)/Math.abs(priorVal);
+      const sign=chg>=0?'+':'';
+      wow=`${sign}${(chg*100).toFixed(1)}%`;
+      if(chg>0.10) wowCls='style="color:var(--red);font-weight:600;"';
+      else if(chg<-0.10) wowCls='style="color:var(--green-dark);font-weight:600;"';
+    }
+    tHtml+=`<tr><td>${label}</td><td class="r">${curr!==null?f$(curr,2):'—'}</td><td class="r">${pct!==null?fP(pct):'—'}</td><td class="r">${priorVal!==null?f$(priorVal,2):'—'}</td><td class="r" ${wowCls}>${wow}</td></tr>`;
+  });
+  tHtml+='</tbody></table>';
+  document.getElementById('ingredient-spend').innerHTML=tHtml;
+}
+
+// ── RENDER KPI TARGETS ────────────────────────────────────────────────────────
+function renderKPI(pl) {
+  const locKey = loc;
+  const weekEnd = (raw.plWeekEnd) || new Date().toISOString().slice(0,10);
+  const month = parseInt((weekEnd||'').slice(5,7)) || (new Date().getMonth()+1);
+  const q = month<=3?1:month<=6?2:month<=9?3:4;
+  const targets = KPI_TARGETS[locKey]?.[q] || {};
+  const ns = pl.netSales || 1;
+
+  const metrics = [
+    {
+      label: 'Total COGS',
+      actual: pl.totalCogs ? pl.totalCogs/ns : null,
+      target: targets.cogs,
+      dollar: pl.totalCogs,
+      note: 'incl. food, bev, paper goods',
+    },
+    {
+      label: 'Total Labor',
+      actual: pl.totalLabor ? pl.totalLabor/ns : null,
+      target: targets.labor,
+      dollar: pl.totalLabor,
+      note: 'hourly + mgmt + taxes + benefits',
+    },
+    {
+      label: '4-Wall EBITDA',
+      actual: pl.ebitda ? pl.ebitda/ns : null,
+      target: targets.ebitda,
+      dollar: pl.ebitda,
+      note: 'after occupancy & utilities',
+      higherIsBetter: true,
+    },
+  ];
+
+  const qLabel = `Q${q} 2026 Targets`;
+  document.getElementById('kpi-date').textContent = qLabel;
+
+  let html = `<table class="eff-table"><thead><tr>
+    <th>Metric</th><th class="r">Actual %</th><th class="r">Actual $</th>
+    <th class="r">Target %</th><th class="r">vs Target</th>
+  </tr></thead><tbody>`;
+
+  metrics.forEach(m => {
+    const higherIsBetter = m.higherIsBetter || false;
+    const actualPct = m.actual;
+    const targetPct = m.target;
+    let vsHtml = '—';
+    if (actualPct !== null && targetPct) {
+      const diff = actualPct - targetPct;
+      const over = diff > 0;
+      // for COGS/Labor: over target = bad. For EBITDA: over target = good.
+      const isGood = higherIsBetter ? over : !over;
+      const color = isGood ? 'var(--green-dark)' : 'var(--red)';
+      const sign = over ? '+' : '';
+      const label = isGood ? (over?'above':'below')+' target' : (over?'above':'below')+' target';
+      vsHtml = `<span style="color:${color};font-weight:600;">${sign}${(diff*100).toFixed(1)}%</span><br><span style="font-size:10px;color:${color};">${label}</span>`;
+    }
+    html += `<tr>
+      <td>${m.label}<br><span style="font-size:10px;color:var(--text-light);">${m.note}</span></td>
+      <td class="r">${actualPct!==null?fP(actualPct):'—'}</td>
+      <td class="r">${m.dollar!==null?f$(m.dollar,0):'—'}</td>
+      <td class="r" style="color:var(--text-light);">${targetPct?(targetPct*100).toFixed(1)+'%':'—'}</td>
+      <td class="r">${vsHtml}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('kpi-content').innerHTML = html;
+}
+
+// ── RENDER MAINTENANCE LOG ────────────────────────────────────────────────────
+function renderMaintenance(maintRows) {
+  if (!maintRows || !maintRows.length) {
+    document.getElementById('maint-content').innerHTML = '<div style="color:var(--text-light);font-size:12px;">No maintenance data available.</div>';
+    return;
+  }
+
+  // Find header row — look for 'Date' or 'Equipment' in first row
+  let dataRows = maintRows;
+  const hdr = maintRows[0];
+  if (hdr && hdr.some(c => (c||'').toString().toLowerCase().includes('date'))) {
+    dataRows = maintRows.slice(1);
+  }
+
+  const today = new Date();
+  const OPEN_STATUSES = new Set(['in progress','','not completed','not started','pending']);
+  const open = [];
+
+  dataRows.forEach(r => {
+    if (!r || !r.length) return;
+    const dateStr  = (r[0]||'').toString().trim();
+    const equip    = (r[1]||'').toString().trim();
+    const desc     = (r[2]||'').toString().trim();
+    const status   = (r[4]||'').toString().trim().toLowerCase();
+
+    if (!desc) return; // skip rows with no description
+    if (!OPEN_STATUSES.has(status)) return; // skip completed/canceled
+
+    const itemDate = dateStr ? new Date(dateStr) : null;
+    const daysOpen = itemDate && !isNaN(itemDate)
+      ? Math.floor((today - itemDate) / (1000*60*60*24))
+      : null;
+
+    open.push({ date:dateStr, equip, desc, status:r[4]||'', daysOpen });
+  });
+
+  if (!open.length) {
+    document.getElementById('maint-content').innerHTML = '<div style="color:var(--green-dark);font-size:12px;">✓ No open maintenance items.</div>';
+    return;
+  }
+
+  // Sort by days open descending
+  open.sort((a,b) => (b.daysOpen||0) - (a.daysOpen||0));
+
+  let html = `<table class="eff-table"><thead><tr>
+    <th>Date</th><th>Equipment</th><th>Description</th><th>Status</th><th class="r">Days open</th>
+  </tr></thead><tbody>`;
+
+  open.forEach(item => {
+    const old = item.daysOpen !== null && item.daysOpen > 30;
+    const dStyle = old ? 'color:var(--red);font-weight:600;' : '';
+    const statusBadge = item.status
+      ? `<span style="font-size:10px;background:var(--warn-bg,#fff3cd);color:var(--warn,#856404);padding:2px 6px;border-radius:4px;">${item.status}</span>`
+      : '<span style="font-size:10px;color:var(--text-light);">no status</span>';
+    html += `<tr>
+      <td style="white-space:nowrap;">${item.date||'—'}</td>
+      <td>${item.equip||'—'}</td>
+      <td>${item.desc}</td>
+      <td>${statusBadge}</td>
+      <td class="r" style="${dStyle}">${item.daysOpen!==null?item.daysOpen+'d':'—'}${old?' ⚠':''}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('maint-content').innerHTML = html;
 }
 
 // ── RENDER FLAGS ──────────────────────────────────────────────────────────────
-function renderFlags(labor, weekly, deepDive, menu) {
+function renderFlags(labor, weekly, deepDive, pl) {
   const flags=[];
   const add=(type,icon,text)=>flags.push({type,icon,text});
 
@@ -1454,7 +1740,7 @@ function renderFlags(labor, weekly, deepDive, menu) {
   // Data staleness
   if(latest){const d=new Date(latest),now=new Date();if((now-d)/(1000*60*60*24)>14)add('warning','🕐',`Data may be stale — latest week in sheet is <strong>${latest}</strong>.`);}
 
-  // Lunch/Dinner orders missing
+  // Missing order data
   if(weekly.amOrders===0||weekly.amOrders===null) add('error','⚠','Lunch orders are <strong>zero</strong> — possible Toast sync issue.');
   if(weekly.pmOrders===0||weekly.pmOrders===null) add('error','⚠','Dinner orders are <strong>zero</strong> — possible Toast sync issue.');
 
@@ -1466,14 +1752,38 @@ function renderFlags(labor, weekly, deepDive, menu) {
     });
   }
 
-  // Wage / sales targets
-  if(labor.wageStatus&&up(labor.wageStatus).includes('OVER')) add('warning','📊',`Labor wages <strong>over target</strong>: ${labor.wageStatus}`);
-  if(labor.salesStatus&&up(labor.salesStatus).includes('UNDER')) add('warning','📊',`Sales <strong>under target</strong>: ${labor.salesStatus}`);
+  // Labor over KPI target
+  const month = new Date().getMonth()+1;
+  const q = month<=3?1:month<=6?2:month<=9?3:4;
+  const targets = KPI_TARGETS[loc]?.[q]||{};
+  const ns = pl.netSales || 1;
 
-  // Total F&B COGS > 30%
-  if(weekly.cogsPct&&weekly.cogsPct>0.30) add('warning','💰',`Total F&B COGS is <strong>${fP(weekly.cogsPct)}</strong> — above 30% threshold.`);
+  if (pl.totalLabor && targets.labor) {
+    const laborPct = pl.totalLabor / ns;
+    if (laborPct > targets.labor) {
+      // Find highest-cost role on highest-cost day from 7shifts punches
+      let worstDay=null, worstRole=null, worstAmt=0;
+      if (labor.days) {
+        labor.days.forEach(d=>{
+          if (d.labor > worstAmt) { worstAmt=d.labor; worstDay=d; }
+        });
+      }
+      // Find highest-cost role overall from roles headcount
+      let topRole=null, topRoleAmt=0;
+      if (labor.roles) {
+        labor.roles.forEach(r=>{
+          const total = r.daily.reduce((s,v)=>s+(v||0),0);
+          if (total > topRoleAmt) { topRoleAmt=total; topRole=r.role; }
+        });
+      }
+      let detail = `Labor at <strong>${fP(laborPct)}</strong> vs <strong>${fP(targets.labor)}</strong> Q${q} target.`;
+      if (worstDay) detail += ` Highest cost day: <strong>${worstDay.dow} (${f$(worstDay.labor,0)})</strong>.`;
+      if (topRole)  detail += ` Top role: <strong>${topRole}</strong>.`;
+      add('warning','📊', detail);
+    }
+  }
 
-  // Ingredient cost WoW changes — whitelist items only
+  // Ingredient unit cost spikes >10% WoW (from AVT deep dive)
   const wl=EFF_WHITELIST[loc]||[];
   const wlNames=new Set(wl.map(x=>x.name));
   wlNames.forEach(name=>{
@@ -1487,21 +1797,42 @@ function renderFlags(labor, weekly, deepDive, menu) {
     if(vL&&vP&&vP!==0){
       const c=(vL-vP)/vP;
       if(Math.abs(c)>0.10){
+        const displayName = EFF_GROUPS[loc]?.find(g=>g.keys.includes(name))?.label || name;
         const dir=c>0?'up':'down';
-        add(c>0?'warning':'info',c>0?'↑':'↓',`<strong>${name}</strong> cost/unit ${dir} ${(Math.abs(c)*100).toFixed(1)}% WoW (${f$(vP,2)} → ${f$(vL,2)}).`);
+        add(c>0?'warning':'info',c>0?'↑':'↓',
+          `<strong>${displayName}</strong> unit cost ${dir} <strong>${(Math.abs(c)*100).toFixed(1)}%</strong> WoW — ${f$(vP,2)} → ${f$(vL,2)}. Review purchasing.`);
       }
     }
   });
 
-  // Efficiency flags — whitelist items only, <80% or >120%
+  // Ingredient category spend spikes >10% WoW (from P&L)
+  const catSpikes = [
+    {curr:'beefCost',    prior:'priorBeefCost',    label:'Beef'},
+    {curr:'poultryCost', prior:'priorPoultryCost', label:'Poultry'},
+    {curr:'porkCost',    prior:'priorPorkCost',    label:'Pork'},
+    {curr:'seafoodCost', prior:'priorSeafoodCost', label:'Seafood'},
+    {curr:'liquorCost',  prior:'priorLiquorCost',  label:'Liquor'},
+    {curr:'beerCost',    prior:'priorBeerCost',    label:'Beer'},
+  ];
+  catSpikes.forEach(({curr,prior,label})=>{
+    const vL=pl[curr], vP=pl[prior];
+    if(vL===null||vP===null||vP===0)return;
+    const c=(vL-vP)/Math.abs(vP);
+    if(c>0.10){
+      add('warning','↑',`<strong>${label} spend</strong> up <strong>${(c*100).toFixed(1)}%</strong> vs prior week — ${f$(vP,0)} → ${f$(vL,0)}. Review purchasing.`);
+    }
+  });
+
+  // Efficiency flags — <80% or >120%
   if(latest){
     wl.forEach(({name})=>{
       const data=items[name];
       if(!data)return;
       const eff=data.metrics?.['Efficiency %']?.[latest]??null;
       if(eff===null)return;
-      if(eff<0.80) add('error','📉',`<strong>${name}</strong> efficiency <strong>${fP(eff)}</strong> — below 80%.`);
-      else if(eff>1.20) add('warning','📈',`<strong>${name}</strong> efficiency <strong>${fP(eff)}</strong> — above 120%.`);
+      const displayName = EFF_GROUPS[loc]?.find(g=>g.keys.includes(name))?.label || name;
+      if(eff<0.80) add('error','📉',`<strong>${displayName}</strong> efficiency <strong>${fP(eff)}</strong> — below 80%.`);
+      else if(eff>1.20) add('warning','📈',`<strong>${displayName}</strong> efficiency <strong>${fP(eff)}</strong> — above 120%.`);
     });
   }
 
@@ -1733,6 +2064,11 @@ function renderAll(){
   const weekly=(raw.weekly||{})[loc==='soho'?'soho':'usq']||{netSales:null,totalCogs:null,cogsPct:null,amOrders:null,pmOrders:null,foodGroups:{},beverages:[]};
   const deepDive=raw.deepDive||{weeks:[],byLoc:{'SoHo':{},'Union Square':{}}};
   const menu=(loc==='soho' ? raw.menuBySoho : raw.menuByUsq)||{sections:{}};
+  const pl=parsePLData(raw.plData?.[locLabel]||[]);
+  const maintRows=raw.maintData?.[loc]||[];
+
+  // Store week end date for KPI quarter detection
+  raw.plWeekEnd = pl.netSales ? (raw.plWeekEndStr||null) : null;
 
   const labor=parseLaborTab(laborRows);
 
@@ -1742,13 +2078,15 @@ function renderAll(){
   if(labor.totalOrders===null) labor.totalOrders = weekly.totalOrders;
 
   renderExecSummary();
-  renderSummary(labor,weekly);
+  renderSummary(labor, weekly, pl);
   renderDiscounts(weekly);
   renderLaborDetail(labor);
-  renderCogs(weekly, menu);
+  renderCogs(weekly, menu, pl);
   renderEfficiency(deepDive);
-  renderTrends(deepDive);
-  renderFlags(labor,weekly,deepDive,menu);
+  renderTrends(deepDive, pl);
+  renderKPI(pl);
+  renderMaintenance(maintRows);
+  renderFlags(labor, weekly, deepDive, pl);
 
   // Populate section date ranges
   if(labor.days && labor.days.length){
@@ -1787,9 +2125,7 @@ async function init(){
       deepTab  ?getRows(SHEETS.cogs,deepTab)  :Promise.resolve([]),
     ]);
 
-    // Menu: use location-specific tab (SoHo or Union Square)
-    // menuTabs = ['Menu Engineering Analysis', 'SoHo', 'Union Square', ...]
-    // We store both so we can switch by location
+    // Menu: use location-specific tab
     const sohoMenuTab   = menuTabs.find(t=>/^soho/i.test(t))   || menuTabs[0];
     const usqMenuTab    = menuTabs.find(t=>/union/i.test(t))    || menuTabs[0];
     const [sohoMenuRows, usqMenuRows] = await Promise.all([
@@ -1797,7 +2133,33 @@ async function init(){
       getRows(SHEETS.menu, usqMenuTab),
     ]);
 
-    // Fetch Weekly History tabs from labor and COGS sheets
+    // P&L Data tabs — written by pl_report.py to labor sheet per location
+    const plData = {};
+    try {
+      const plSohoTab = laborTabs.find(t=>t==='P&L Data - SoHo'||t==='P&L Data');
+      const plUsqTab  = laborTabs.find(t=>t==='P&L Data - Union Square'||t==='P&L Data USQ');
+      if (plSohoTab) plData['SoHo']          = await getRows(SHEETS.labor, plSohoTab);
+      if (plUsqTab)  plData['Union Square']   = await getRows(SHEETS.labor, plUsqTab);
+      // Fallback: try fetching P&L Data from COGS sheet for USQ
+      if (!plData['Union Square']) {
+        const cogsPlTab = cogsTabs.find(t=>t==='P&L Data');
+        if (cogsPlTab) plData['Union Square'] = await getRows(SHEETS.cogs, cogsPlTab);
+      }
+    } catch(e) { console.log('P&L Data tabs not found yet:', e.message); }
+
+    // Maintenance logs — read live from dedicated sheets
+    const maintData = {};
+    try {
+      const [sohoMaintRows, usqMaintRows] = await Promise.all([
+        getRows(MAINT_SHEETS.soho, 'SOHO MAINTENANCE'),
+        getRows(MAINT_SHEETS.usq,  'USQ MAINTENANCE').catch(()=>
+          getRows(MAINT_SHEETS.usq, 'Sheet1').catch(()=>[])),
+      ]);
+      maintData.soho = sohoMaintRows;
+      maintData.usq  = usqMaintRows;
+    } catch(e) { console.log('Maintenance log fetch failed:', e.message); }
+
+    // Weekly History tabs
     let laborHistoryRows = [], cogsHistoryRows = [];
     try {
       const laborHistTab = laborTabs.find(t=>/weekly.history/i.test(t)||t==='Weekly History');
@@ -1808,7 +2170,6 @@ async function init(){
       if (cogsHistTab) cogsHistoryRows = await getRows(SHEETS.cogs, cogsHistTab);
     } catch(e) { console.log('COGS history tab not found yet:', e.message); }
 
-    // Parse history rows (skip header row)
     const parseHistory = rows => rows.length>1 ? rows.slice(1) : [];
 
     raw={
@@ -1819,13 +2180,15 @@ async function init(){
       menuByUsq:    parseMenu(usqMenuRows),
       laborHistory: parseHistory(laborHistoryRows),
       cogsHistory:  parseHistory(cogsHistoryRows),
+      plData,
+      maintData,
     };
 
     renderAll();
   } catch(err){
     const msg=err.message||String(err);
     const e=`<div class="error-state">⚠ Could not load data: ${msg}<br><br>Make sure sheets are set to "Anyone with the link can view" and the API key is valid.</div>`;
-    ['summary-cards','cogs-cards','eff-wrap','trends-content','flags-body'].forEach(id=>{
+    ['summary-cards','cogs-cards','eff-wrap','trends-content','flags-body','kpi-content','maint-content'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.innerHTML=e;
     });
   }
