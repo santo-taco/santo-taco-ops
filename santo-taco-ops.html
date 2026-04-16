@@ -1854,15 +1854,14 @@ function renderExecSummary() {
     const laborRows = raw.laborTabs?.[locLabel]||[];
     const weekly = (raw.weekly||{})[locKey]||{};
     const labor = parseLaborTab(laborRows);
+    const pl = parsePLData(raw.plData?.[locLabel]||[]);
 
-    const sales    = labor.weekSales || weekly.netSales;
-    const laborAmt = labor.weekLabor;
-    const cogsAmt  = weekly.totalCogs;
-    const cogsPct  = weekly.cogsPct || (sales&&cogsAmt?cogsAmt/sales:null);
-    const laborPct = labor.laborPct || (sales&&laborAmt?laborAmt/sales:null);
-    const totalLaborAmt = labor.totalLabor || laborAmt;
-    const prime    = (totalLaborAmt||0)+(cogsAmt||0);
-    const primePct = sales?prime/sales:null;
+    const sales         = pl.netSales || labor.weekSales || weekly.netSales;
+    const laborAmt      = pl.totalHourly || labor.weekLabor;
+    const totalLaborAmt = pl.totalLabor || null;
+    const cogsAmt       = pl.totalCogs || weekly.totalCogs;
+    const cogsPct       = pl.cogsPct || (sales&&cogsAmt?cogsAmt/sales:null);
+    const laborPct      = pl.laborPct || labor.laborPct || (sales&&laborAmt?laborAmt/sales:null);
     const am = weekly.amOrders;
     const pm = weekly.pmOrders;
     const totalOrdersE = weekly.totalOrders || ((am||0)+(pm||0));
@@ -1870,10 +1869,6 @@ function renderExecSummary() {
     const ophDayE  = totalOrdersE>0 && totalHoursE>0 ? (totalOrdersE/totalHoursE).toFixed(1) : null;
     const avgCheckE= totalOrdersE>0&&sales ? f$(sales/totalOrdersE,2) : null;
 
-    // Row 1: Total Sales (with WoW arrow placeholder) | Total COGS
-    // Row 2: Hourly Labor | Prime Cost
-    // Row 3: Lunch Orders/hr | Dinner Orders/hr
-    // Last week sales from Weekly History tab (labor sheet)
     const locHistory = (raw.laborHistory||[]).filter(r=>r[2]===locLabel);
     const sortedHist = locHistory.sort((a,b)=>a[0]<b[0]?-1:1);
     const lastWeekRow = sortedHist.length>=2 ? sortedHist[sortedHist.length-2] : null;
@@ -1887,19 +1882,14 @@ function renderExecSummary() {
     }
 
     const rows = [
-      // row 1
-      {label:'Total Sales',   value:f$(sales),                           rawSub:salesSub},
-      {label:'Total F&B COGS',  value:cogsPct!==null?fP(cogsPct):'—',      sub:f$(cogsAmt,2)},
-      // divider
+      {label:'Total Sales',      value:f$(sales),                               rawSub:salesSub},
+      {label:'Total COGS',       value:cogsPct!==null?fP(cogsPct):'—',          sub:cogsAmt?f$(cogsAmt,0):null},
       null,
-      // row 2
-      {label:'Hourly Labor',      value:f$(laborAmt),                     sub:laborPct?fP(laborPct)+' of sales':null},
-      {label:'Total Labor Cost',  value:'—',                              sub:'% of sales'},
-      // divider
+      {label:'Hourly Labor',     value:f$(laborAmt),                            sub:laborPct?fP(laborPct)+' of sales':null},
+      {label:'Total Labor Cost', value:totalLaborAmt?f$(totalLaborAmt):'—',     sub:totalLaborAmt&&sales?fP(totalLaborAmt/sales)+' of sales':null},
       null,
-      // row 3
-      {label:'ORDERS/HR',     value:ophDayE||'—',  sub:totalOrdersE>0?totalOrdersE+' total orders':null},
-      {label:'Avg Check',     value:avgCheckE||'—'},
+      {label:'Orders / hr',      value:ophDayE||'—',  sub:totalOrdersE>0?totalOrdersE+' total orders':null},
+      {label:'Avg Check',        value:avgCheckE||'—'},
     ];
 
     const el = document.getElementById(labelId);
@@ -2110,86 +2100,107 @@ function renderAll(){
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 async function init(){
+  const errors = [];
+
+  // ── Labor tabs ──────────────────────────────────────────────────────────────
+  let laborTabs = [], laborTabData = {};
   try {
-    const [laborTabs,cogsTabs,menuTabs]=await Promise.all([getTabs(SHEETS.labor),getTabs(SHEETS.cogs),getTabs(SHEETS.menu)]);
+    laborTabs = await getTabs(SHEETS.labor);
+    await Promise.all(laborTabs.map(async t => {
+      try { laborTabData[t] = await getRows(SHEETS.labor, t); }
+      catch(e) { console.warn('Labor tab fetch failed:', t, e.message); }
+    }));
+  } catch(e) { errors.push('Labor sheet: ' + e.message); console.error(e); }
 
-    // Labor: fetch both location tabs
-    const laborTabData={};
-    await Promise.all(laborTabs.map(async t=>{laborTabData[t]=await getRows(SHEETS.labor,t);}));
-
-    // COGS tabs
-    const weeklyTab=cogsTabs.find(t=>/weekly/i.test(t))||cogsTabs[0];
-    const deepTab  =cogsTabs.find(t=>/deep/i.test(t))  ||cogsTabs[1];
-    const [weeklyRows,deepRows]=await Promise.all([
-      weeklyTab?getRows(SHEETS.cogs,weeklyTab):Promise.resolve([]),
-      deepTab  ?getRows(SHEETS.cogs,deepTab)  :Promise.resolve([]),
+  // ── COGS tabs ───────────────────────────────────────────────────────────────
+  let cogsTabs = [], weeklyRows = [], deepRows = [];
+  try {
+    cogsTabs = await getTabs(SHEETS.cogs);
+    const weeklyTab = cogsTabs.find(t=>/weekly/i.test(t)) || cogsTabs[0];
+    const deepTab   = cogsTabs.find(t=>/deep/i.test(t))   || cogsTabs[1];
+    [weeklyRows, deepRows] = await Promise.all([
+      weeklyTab ? getRows(SHEETS.cogs, weeklyTab) : Promise.resolve([]),
+      deepTab   ? getRows(SHEETS.cogs, deepTab)   : Promise.resolve([]),
     ]);
+  } catch(e) { errors.push('COGS sheet: ' + e.message); console.error(e); }
 
-    // Menu: use location-specific tab
-    const sohoMenuTab   = menuTabs.find(t=>/^soho/i.test(t))   || menuTabs[0];
-    const usqMenuTab    = menuTabs.find(t=>/union/i.test(t))    || menuTabs[0];
-    const [sohoMenuRows, usqMenuRows] = await Promise.all([
+  // ── Menu tabs ───────────────────────────────────────────────────────────────
+  let sohoMenuRows = [], usqMenuRows = [];
+  try {
+    const menuTabs    = await getTabs(SHEETS.menu);
+    const sohoMenuTab = menuTabs.find(t=>/^soho/i.test(t))  || menuTabs[0];
+    const usqMenuTab  = menuTabs.find(t=>/^union/i.test(t)) || menuTabs[1] || menuTabs[0];
+    [sohoMenuRows, usqMenuRows] = await Promise.all([
       getRows(SHEETS.menu, sohoMenuTab),
       getRows(SHEETS.menu, usqMenuTab),
     ]);
+  } catch(e) { console.warn('Menu sheet:', e.message); }
 
-    // P&L Data tabs — written by pl_report.py to labor sheet per location
-    const plData = {};
-    try {
-      const plSohoTab = laborTabs.find(t=>t==='P&L Data - SoHo'||t==='P&L Data');
-      const plUsqTab  = laborTabs.find(t=>t==='P&L Data - Union Square'||t==='P&L Data USQ');
-      if (plSohoTab) plData['SoHo']          = await getRows(SHEETS.labor, plSohoTab);
-      if (plUsqTab)  plData['Union Square']   = await getRows(SHEETS.labor, plUsqTab);
-      // Fallback: try fetching P&L Data from COGS sheet for USQ
-      if (!plData['Union Square']) {
-        const cogsPlTab = cogsTabs.find(t=>t==='P&L Data');
-        if (cogsPlTab) plData['Union Square'] = await getRows(SHEETS.cogs, cogsPlTab);
-      }
-    } catch(e) { console.log('P&L Data tabs not found yet:', e.message); }
+  // ── P&L Data tabs ───────────────────────────────────────────────────────────
+  const plData = {};
+  try {
+    const plSohoTab = laborTabs.find(t => t === 'P&L Data');
+    if (plSohoTab) plData['SoHo'] = await getRows(SHEETS.labor, plSohoTab);
+  } catch(e) { console.warn('SoHo P&L Data:', e.message); }
+  try {
+    const plUsqTab = cogsTabs.find(t => t === 'P&L Data');
+    if (plUsqTab) plData['Union Square'] = await getRows(SHEETS.cogs, plUsqTab);
+  } catch(e) { console.warn('USQ P&L Data:', e.message); }
 
-    // Maintenance logs — read live from dedicated sheets
-    const maintData = {};
-    try {
-      const [sohoMaintRows, usqMaintRows] = await Promise.all([
-        getRows(MAINT_SHEETS.soho, 'SOHO MAINTENANCE'),
-        getRows(MAINT_SHEETS.usq,  'USQ MAINTENANCE').catch(()=>
-          getRows(MAINT_SHEETS.usq, 'Sheet1').catch(()=>[])),
-      ]);
-      maintData.soho = sohoMaintRows;
-      maintData.usq  = usqMaintRows;
-    } catch(e) { console.log('Maintenance log fetch failed:', e.message); }
+  // ── Maintenance logs ────────────────────────────────────────────────────────
+  const maintData = {};
+  try {
+    maintData.soho = await getRows(MAINT_SHEETS.soho, 'SOHO MAINTENANCE');
+  } catch(e) { console.warn('SoHo maintenance:', e.message); maintData.soho = []; }
+  try {
+    maintData.usq = await getRows(MAINT_SHEETS.usq, 'union');
+  } catch(e) {
+    try { maintData.usq = await getRows(MAINT_SHEETS.usq, 'Sheet1'); }
+    catch(e2) { console.warn('USQ maintenance:', e2.message); maintData.usq = []; }
+  }
 
-    // Weekly History tabs
-    let laborHistoryRows = [], cogsHistoryRows = [];
-    try {
-      const laborHistTab = laborTabs.find(t=>/weekly.history/i.test(t)||t==='Weekly History');
-      if (laborHistTab) laborHistoryRows = await getRows(SHEETS.labor, laborHistTab);
-    } catch(e) { console.log('Labor history tab not found yet:', e.message); }
-    try {
-      const cogsHistTab = cogsTabs.find(t=>/weekly.history/i.test(t)||t==='Weekly History');
-      if (cogsHistTab) cogsHistoryRows = await getRows(SHEETS.cogs, cogsHistTab);
-    } catch(e) { console.log('COGS history tab not found yet:', e.message); }
+  // ── Weekly History tabs ─────────────────────────────────────────────────────
+  let laborHistoryRows = [], cogsHistoryRows = [];
+  try {
+    const laborHistTab = laborTabs.find(t => /weekly.history/i.test(t) || t === 'Weekly History');
+    if (laborHistTab) laborHistoryRows = await getRows(SHEETS.labor, laborHistTab);
+  } catch(e) { console.warn('Labor history:', e.message); }
+  try {
+    const cogsHistTab = cogsTabs.find(t => /weekly.history/i.test(t) || t === 'Weekly History');
+    if (cogsHistTab) cogsHistoryRows = await getRows(SHEETS.cogs, cogsHistTab);
+  } catch(e) { console.warn('COGS history:', e.message); }
 
-    const parseHistory = rows => rows.length>1 ? rows.slice(1) : [];
+  const parseHistory = rows => rows.length > 1 ? rows.slice(1) : [];
 
-    raw={
-      laborTabs:    laborTabData,
-      weekly:       parseWeekly(weeklyRows),
-      deepDive:     parseDeepDive(deepRows),
-      menuBySoho:   parseMenu(sohoMenuRows),
-      menuByUsq:    parseMenu(usqMenuRows),
-      laborHistory: parseHistory(laborHistoryRows),
-      cogsHistory:  parseHistory(cogsHistoryRows),
-      plData,
-      maintData,
-    };
+  raw = {
+    laborTabs:    laborTabData,
+    weekly:       parseWeekly(weeklyRows),
+    deepDive:     parseDeepDive(deepRows),
+    menuBySoho:   parseMenu(sohoMenuRows),
+    menuByUsq:    parseMenu(usqMenuRows),
+    laborHistory: parseHistory(laborHistoryRows),
+    cogsHistory:  parseHistory(cogsHistoryRows),
+    plData,
+    maintData,
+  };
 
+  // Show any critical errors at top but still try to render
+  if (errors.length) {
+    const errHtml = `<div class="error-state">⚠ ${errors.join('<br>')}<br><br>Make sure all sheets are set to "Anyone with the link can view".</div>`;
+    ['summary-cards'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.innerHTML = errHtml;
+    });
+    console.error('Init errors:', errors);
+  }
+
+  try {
     renderAll();
-  } catch(err){
-    const msg=err.message||String(err);
-    const e=`<div class="error-state">⚠ Could not load data: ${msg}<br><br>Make sure sheets are set to "Anyone with the link can view" and the API key is valid.</div>`;
-    ['summary-cards','cogs-cards','eff-wrap','trends-content','flags-body','kpi-content','maint-content'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.innerHTML=e;
+  } catch(err) {
+    console.error('renderAll failed:', err);
+    const msg = err.message || String(err);
+    const e = `<div class="error-state">⚠ Render error: ${msg}</div>`;
+    ['summary-cards','cogs-cards','eff-wrap','trends-content','flags-body','kpi-content','maint-content'].forEach(id => {
+      const el = document.getElementById(id); if (el && el.innerHTML.includes('Loading')) el.innerHTML = e;
     });
   }
 }
