@@ -1686,8 +1686,8 @@ function renderMaintenance(maintData) {
     });
   };
 
-  parseLoc(maintData.soho, 'SoHo');
-  parseLoc(maintData.usq,  'USQ');
+  if (loc === 'soho') parseLoc(maintData.soho, 'SoHo');
+  else                parseLoc(maintData.usq,  'USQ');
 
   if (!open.length) {
     document.getElementById('maint-content').innerHTML = '<div style="color:var(--green-dark);font-size:12px;">✓ No open maintenance items.</div>';
@@ -1698,7 +1698,7 @@ function renderMaintenance(maintData) {
   open.sort((a,b) => (b.daysOpen||0) - (a.daysOpen||0));
 
   let html = `<table class="eff-table"><thead><tr>
-    <th>Location</th><th>Date</th><th>Equipment</th><th>Description</th><th>Status</th><th class="r">Days open</th>
+    <th>Date</th><th>Equipment</th><th>Description</th><th>Status</th><th class="r">Days open</th>
   </tr></thead><tbody>`;
 
   open.forEach(item => {
@@ -1708,7 +1708,6 @@ function renderMaintenance(maintData) {
       ? `<span style="font-size:10px;background:var(--warn-bg,#fff3cd);color:var(--warn,#856404);padding:2px 6px;border-radius:4px;">${item.status}</span>`
       : '<span style="font-size:10px;color:var(--text-light);">no status</span>';
     html += `<tr>
-      <td style="white-space:nowrap;font-weight:600;">${item.loc}</td>
       <td style="white-space:nowrap;">${item.date||'—'}</td>
       <td>${item.equip||'—'}</td>
       <td>${item.desc}</td>
