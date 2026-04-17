@@ -952,11 +952,11 @@ function renderSummary(labor, weekly, pl) {
   // Avg check = net sales / total orders (pre-tax, pre-tip from Toast — matches Toast Service Mode Summary)
   const avgCheck = totalOrders > 0 && sales ? f$(sales / totalOrders, 2) : null;
 
-  // Prior week from P&L History
+  // Prior week — sales from R365 (pl.priorNetSales), labor from P&L or history fallback
   const locLabelSummary = loc==='soho'?'SoHo':'Union Square';
   const locHistSummary  = (raw.laborHistory||[]).filter(r=>r[2]===locLabelSummary).sort((a,b)=>a[0]<b[0]?-1:1);
   const lastWkRow = locHistSummary.length>=2 ? locHistSummary[locHistSummary.length-2] : null;
-  const lastWkSales  = lastWkRow ? parseFloat(lastWkRow[3]) : null;
+  const lastWkSales  = pl.priorNetSales || (lastWkRow ? parseFloat(lastWkRow[3]) : null);
   const lastWkLabor  = pl.priorTotalHourly || (lastWkRow ? parseFloat(lastWkRow[4]) : null);
 
   function wowSub(current, prior, isCost) {
@@ -1899,7 +1899,7 @@ function renderExecSummary() {
     const locHistory = (raw.laborHistory||[]).filter(r=>r[2]===locLabel);
     const sortedHist = locHistory.sort((a,b)=>a[0]<b[0]?-1:1);
     const lastWeekRow = sortedHist.length>=2 ? sortedHist[sortedHist.length-2] : null;
-    const lastWeekSales = lastWeekRow ? parseFloat(lastWeekRow[3]) : null;
+    const lastWeekSales = pl.priorNetSales || (lastWeekRow ? parseFloat(lastWeekRow[3]) : null);
     let salesSub = null;
     if (lastWeekSales!==null && sales!==null) {
       const diff = sales - lastWeekSales;
