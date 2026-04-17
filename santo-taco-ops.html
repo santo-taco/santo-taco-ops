@@ -2116,22 +2116,16 @@ function renderAll(){
     pl._histWk     = r[1] || r[0];
   }
 
-  // Always override prior-week fields from P&L History (second-to-last completed row).
-  // The P&L Data tab's "PRIOR WEEK $" column is unreliable — when R365 sends the email
-  // mid-week, pl_report.py column-swaps and "prior" ends up holding the current
-  // in-progress partial week, not the true prior completed week.
+  // Override priorNetSales from P&L History — the P&L Data "PRIOR WEEK $" for net sales
+  // holds partial current-week data (from the column swap in pl_report.py), not true prior week.
+  // Ingredient-level priors (beef, pork, etc.) are left as-is from parsePLData since they
+  // correctly reflect what the R365 email labels as "last week."
   if (plHistSorted.length >= 2) {
     const pr = plHistSorted[plHistSorted.length - 2];
-    pl.priorNetSales    = pN(pr[3]);
-    pl.priorTotalCogs   = pN(pr[8]);
-    pl.priorSeafoodCost = pN(pr[9]);
-    pl.priorBeefCost    = pN(pr[10]);
-    pl.priorPoultryCost = pN(pr[11]);
-    pl.priorPorkCost    = pN(pr[12]);
-    pl.priorLiquorCost  = pN(pr[13]);
-    pl.priorBeerCost    = pN(pr[14]);
-    pl.priorTotalLabor  = pN(pr[19]);
-    pl.priorEbitda      = pN(pr[23]);
+    pl.priorNetSales  = pN(pr[3]) || pl.priorNetSales;
+    pl.priorTotalCogs = pN(pr[8]) || pl.priorTotalCogs;
+    pl.priorTotalLabor= pN(pr[19])|| pl.priorTotalLabor;
+    pl.priorEbitda    = pN(pr[23])|| pl.priorEbitda;
   }
 
   const maintRows=raw.maintData||{};
