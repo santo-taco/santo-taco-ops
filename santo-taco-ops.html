@@ -511,7 +511,7 @@ body {
   <div class="section">
     <div class="section-header">
       <div><div class="section-title">Maintenance Log</div><div class="section-date" id="maint-date"></div></div>
-      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">OPEN &amp; IN PROGRESS ITEMS · LIVE FROM SHEETS</div>
+      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">OPEN &amp; IN PROGRESS ITEMS · BOTH LOCATIONS · LIVE FROM SHEETS</div>
     </div>
     <div class="section-body">
       <div id="maint-content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
@@ -540,7 +540,7 @@ const API_KEY  = 'AIzaSyBfRG-cpHyrBkjN3JSD4psoJz1l3ooiF90';
 const SHEETS   = {
   labor: '1qEh_bnAX9JzvZNKPiUUQt-5Kc6Pk2K6SxRzz9e4gcnk',
   cogs:  '1FmjJqxwxZz4FmosAqC7H2L7S-tTczjzWnUQURaLN7rg',
-  menu:  '1dyxWXbuGfCawxUYgO8aJicc34JbDWPp9eTvo1Zh6UaU',
+  menu:  '1dyxWXbuGfCawxUYgO8aJicc34JbDWPp9eTfo1Zh6UaU',
   // P&L Data is written by pl_report.py to the labor sheet (per location tab)
   // and a shared COGS sheet for USQ. Both use the same P&L Data tab name.
 };
@@ -574,16 +574,9 @@ const TREND_ITEMS = {
   'Tuna Saku block frozen':        'Tuna Saku',
 };
 
-// USQ uses different AVT ingredient names for the same items
-const TREND_ITEMS_USQ = {
-  'Subrecipe: NYStripLoin sliced': 'Beef Strip Loin #180 0X1 [Choice]',
-  'Subrecipe: Sirloin sliced':     'Beef Flap [Soft] Meat #185A [Choice]',
-  'Subrecipe: Pollo clean':        'Chicken Thighs Boneless Skinless Fresh',
-  'Recipes: Carnitas':             'Recipes: Carnitas',
-  'Shrimp 21/25':                  'Shrimp 21/25',
-  'Avocado Hass':                  'Avocado Hass',
-  'Tuna Saku block frozen':        'Tuna Saku block frozen',
-};
+// USQ uses same subrecipe names as SoHo — cogs_deep_dive.py writes subrecipe
+// names for both locations. No remapping needed.
+const TREND_ITEMS_USQ = {};
 
 // KPI targets by location and quarter — hardcoded from Budget 2026
 // HARDCODED: % of net sales. Update each quarter.
@@ -827,14 +820,8 @@ function parseDeepDive(rows) {
 }
 
 function parseMenu(rows) {
-  // Confirmed structure (SoHo/USQ tabs):
-  // Row 0: 'Weighted Avg COGS — Full Menu', pct
-  // Row 1: 'Weighted Avg COGS — Tacos', pct
-  // Row 8: header: Category(0) | Menu Item Name(1) | Qty Sold(2) | Item Sell Price(3) | Item Food Cost(4) | COGS%(5) | Margin%(6) | ...
-  // Row 9: category row — col0 = category name, rest empty
-  // Row 10+: item rows — col0 empty, col1=name, col2=qty, col3=sell, col4=cost, col5=cogs%
-  // Summary rows: col0 starts with 'Summary'
-  const res = { sections:{}, weightedCogs:null, weightedCogsTagcos:null };
+  console.log('[parseMenu] rows:', rows.length, 'first3:', JSON.stringify((rows||[]).slice(0,3)));
+  const res = { sections:{}, weightedCogs:null, weightedCogsTagcos:null, _rowCount:rows.length };
   let currentSection = 'Other';
   let foundHeader = false;
   // col indices based on confirmed header
@@ -936,7 +923,7 @@ function parsePLData(rows) {
 
 // ── RENDER SUMMARY ────────────────────────────────────────────────────────────
 function renderSummary(labor, weekly, pl) {
-  const sales     = pl.netSales || labor.weekSales || weekly.netSales;
+  const sales     = weekly.netSales || pl.netSales || labor.weekSales;
   const laborAmt  = pl.totalHourly || labor.weekLabor;
   const totalLaborAmt = pl.totalLabor || labor.totalLabor || laborAmt;
   const cogsAmt   = pl.totalCogs || weekly.totalCogs;
@@ -976,13 +963,14 @@ function renderSummary(labor, weekly, pl) {
     return `<span style="color:${color};font-weight:600;">${arrow}</span> ${f$(prior)} prior week`;
   }
 
+  const histNote = pl._histWk ? `prior wk ${pl._histWk}` : null;
   const cards = [
     {label:'Total Sales',      value:f$(sales),                           rawSub: wowSub(sales, lastWkSales, false)},
     {label:'Orders / hr',      value:ophDay||'—',                         sub: totalOrders>0?totalOrders+' total orders':null},
     {label:'Avg Check',        value:avgCheck||'—'},
-    {label:'Hourly Labor',     value:f$(laborAmt),                        rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales':null},
-    {label:'Total Labor Cost', value:totalLaborAmt?f$(totalLaborAmt):'—', sub: totalLaborAmt&&sales?fP(totalLaborAmt/sales)+' of sales':'Source: R365 P&L'},
-    {label:'Total COGS',       value:cogsPct!==null?fP(cogsPct):'—',      sub:cogsAmt?f$(cogsAmt,2):null},
+    {label:'Hourly Labor',     value:f$(laborAmt),                        rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales'+(histNote?' · '+histNote:''):null},
+    {label:'Total Labor Cost', value:totalLaborAmt?f$(totalLaborAmt):'—', sub: totalLaborAmt&&sales?fP(totalLaborAmt/sales)+' of sales'+(histNote?' · '+histNote:''):(laborAmt?'(hourly only · 7shifts)':'Source: R365 P&L')},
+    {label:'Total COGS',       value:cogsPct!==null?fP(cogsPct):'—',      sub:cogsAmt?f$(cogsAmt,2)+(histNote?' · '+histNote:''):null},
   ];
 
   document.getElementById('summary-cards').innerHTML = cards.map(c=>`
@@ -1126,7 +1114,7 @@ function renderDailyChart(days, weeklyCogsAmt) {
 }
 
 // ── RENDER LABOR DETAIL ──────────────────────────────────────────────────────
-function renderLaborDetail(labor) {
+function renderLaborDetail(labor, pl) {
   const wrap = document.getElementById('labor-detail-wrap');
   if (!wrap) return;
 
@@ -1191,7 +1179,8 @@ function renderLaborDetail(labor) {
     </div>
     <div class="labor-summary-item">
       <div class="labor-summary-label">Total Labor % of Sales</div>
-      <div class="labor-summary-value">—</div>
+      <div class="labor-summary-value">${(()=>{ if(pl&&pl.laborPct) return fP(pl.laborPct); const tl=(pl&&pl.totalLabor)||labor.totalLabor; const ts=(pl&&pl.netSales)||labor.weekSales; return tl&&ts?fP(tl/ts):'—'; })()}</div>
+      ${pl&&pl._histWk?`<div class="labor-summary-sub" style="color:var(--text-light);">prior wk ${pl._histWk}</div>`:''}
     </div>
   </div>`;
 
@@ -1249,7 +1238,7 @@ function renderDiscounts(weekly) {
   if (!wrap) return;
   const discs = weekly.discounts || [];
   if (!discs.length) {
-    wrap.innerHTML = '<div style="color:var(--text-light);font-size:12px;padding:14px 18px;">No discount data — run cogs_deep_dive.py to populate.</div>';
+    wrap.innerHTML = '<div style="color:var(--text-light);font-size:12px;padding:14px 18px;">No discounts recorded this week.</div>';
     return;
   }
   const total = discs.reduce((s, d) => s + d.amt, 0);
@@ -1315,7 +1304,9 @@ function renderCogs(weekly, menu, pl) {
     });
   });
   html+='</tbody></table>';
-  document.getElementById('menu-content').innerHTML=any?html:'<div style="color:var(--text-light);font-size:12px;">No menu data.</div>';
+  console.log('[renderCogs] menu sections:', Object.keys(sections), 'any:', any);
+  const rowCount = menu&&menu._rowCount!=null ? menu._rowCount : '?';
+  document.getElementById('menu-content').innerHTML=any?html:`<div style="color:var(--text-light);font-size:12px;">No menu data. (${rowCount} rows fetched, ${Object.keys(sections).length} sections parsed)</div>`;
 }
 
 // ── RENDER EFFICIENCY ─────────────────────────────────────────────────────────
@@ -1339,9 +1330,9 @@ const EFF_GROUPS = {
   usq: [
     { label:'Carnitas',          cat:'Food',      keys:['Recipes: Carnitas'] },
     { label:'Zucchini Taco',     cat:'Food',      keys:['Zucchini'] },
-    { label:'NY Strip',          cat:'Food',      keys:['Beef Strip Loin #180 0X1 [Choice]'] },
-    { label:'Sirloin',           cat:'Food',      keys:['Beef Flap [Soft] Meat #185A [Choice]'] },
-    { label:'Chicken',           cat:'Food',      keys:['Chicken Thighs Boneless Skinless Fresh'] },
+    { label:'NY Strip',          cat:'Food',      keys:['Subrecipe: NYStripLoin sliced'] },
+    { label:'Sirloin',           cat:'Food',      keys:['Subrecipe: Sirloin sliced'] },
+    { label:'Chicken',           cat:'Food',      keys:['Subrecipe: Pollo clean'] },
     { label:'Shrimp',            cat:'Food',      keys:['Shrimp 21/25'] },
     { label:'Mushroom Taco',     cat:'Food',      keys:['Shiitake Mushrooms','Cremini Mushrooms'] },
     { label:'Avocado',           cat:'Food',      keys:['Avocado Hass'] },
@@ -1462,7 +1453,8 @@ function renderTrends(deepDive, pl) {
   const available=TREND_ITEMS_ORDER.filter(stdKey=>{
     if(loc==='soho'&&stdKey==='Shrimp 21/25') return false;
     const key=getItemKey(stdKey);
-    return items[key]&&items[key].metrics['Cost / Unit ($)'];
+    const cm=items[key]?.metrics['Cost / Unit ($)'];
+    return cm && Object.values(cm).some(v=>v>0);
   });
 
   if (!available.length) {
@@ -1490,7 +1482,7 @@ function renderTrends(deepDive, pl) {
   available.forEach(stdKey=>{
     const key=getItemKey(stdKey);
     const metric=items[key].metrics['Cost / Unit ($)']||{};
-    const data=weeks.map(w=>metric[w]??null);
+    const data=weeks.map(w=>(metric[w]||null));
     const id='tc_'+stdKey.replace(/[^a-z0-9]/gi,'_');
     const canvas=document.getElementById(id);
     if(!canvas)return;
@@ -1568,6 +1560,11 @@ function renderTrends(deepDive, pl) {
     { key:'beerCost',     prior:'priorBeerCost',    label:'Beer' },
   ];
   const ns = pl.netSales || 1;
+  // Sort by this-week spend descending (nulls last)
+  cats.sort((a,b)=>{
+    const av=pl[a.key]??-Infinity, bv=pl[b.key]??-Infinity;
+    return bv-av;
+  });
   let tHtml=`<div class="spikes-label" style="margin-top:16px;">Category spend — R365 P&L</div>
   <table class="eff-table"><thead><tr>
     <th>Category</th><th class="r">This week $</th><th class="r">% of sales</th><th class="r">Prior week $</th><th class="r">WoW</th>
@@ -1661,40 +1658,36 @@ function renderKPI(pl) {
 }
 
 // ── RENDER MAINTENANCE LOG ────────────────────────────────────────────────────
-function renderMaintenance(maintRows) {
-  if (!maintRows || !maintRows.length) {
-    document.getElementById('maint-content').innerHTML = '<div style="color:var(--text-light);font-size:12px;">No maintenance data available.</div>';
-    return;
-  }
-
-  // Find header row — look for 'Date' or 'Equipment' in first row
-  let dataRows = maintRows;
-  const hdr = maintRows[0];
-  if (hdr && hdr.some(c => (c||'').toString().toLowerCase().includes('date'))) {
-    dataRows = maintRows.slice(1);
-  }
-
-  const today = new Date();
+function renderMaintenance(maintData) {
   const OPEN_STATUSES = new Set(['in progress','','not completed','not started','pending']);
+  const today = new Date();
   const open = [];
 
-  dataRows.forEach(r => {
-    if (!r || !r.length) return;
-    const dateStr  = (r[0]||'').toString().trim();
-    const equip    = (r[1]||'').toString().trim();
-    const desc     = (r[2]||'').toString().trim();
-    const status   = (r[4]||'').toString().trim().toLowerCase();
+  const parseLoc = (rows, locLabel) => {
+    if (!rows || !rows.length) return;
+    let dataRows = rows;
+    const hdr = rows[0];
+    if (hdr && hdr.some(c => (c||'').toString().toLowerCase().includes('date'))) {
+      dataRows = rows.slice(1);
+    }
+    dataRows.forEach(r => {
+      if (!r || !r.length) return;
+      const dateStr = (r[0]||'').toString().trim();
+      const equip   = (r[1]||'').toString().trim();
+      const desc    = (r[2]||'').toString().trim();
+      const status  = (r[4]||'').toString().trim().toLowerCase();
+      if (!desc) return;
+      if (!OPEN_STATUSES.has(status)) return;
+      const itemDate = dateStr ? new Date(dateStr) : null;
+      const daysOpen = itemDate && !isNaN(itemDate)
+        ? Math.floor((today - itemDate) / (1000*60*60*24))
+        : null;
+      open.push({ date:dateStr, equip, desc, status:r[4]||'', daysOpen, loc:locLabel });
+    });
+  };
 
-    if (!desc) return; // skip rows with no description
-    if (!OPEN_STATUSES.has(status)) return; // skip completed/canceled
-
-    const itemDate = dateStr ? new Date(dateStr) : null;
-    const daysOpen = itemDate && !isNaN(itemDate)
-      ? Math.floor((today - itemDate) / (1000*60*60*24))
-      : null;
-
-    open.push({ date:dateStr, equip, desc, status:r[4]||'', daysOpen });
-  });
+  parseLoc(maintData.soho, 'SoHo');
+  parseLoc(maintData.usq,  'USQ');
 
   if (!open.length) {
     document.getElementById('maint-content').innerHTML = '<div style="color:var(--green-dark);font-size:12px;">✓ No open maintenance items.</div>';
@@ -1705,7 +1698,7 @@ function renderMaintenance(maintRows) {
   open.sort((a,b) => (b.daysOpen||0) - (a.daysOpen||0));
 
   let html = `<table class="eff-table"><thead><tr>
-    <th>Date</th><th>Equipment</th><th>Description</th><th>Status</th><th class="r">Days open</th>
+    <th>Location</th><th>Date</th><th>Equipment</th><th>Description</th><th>Status</th><th class="r">Days open</th>
   </tr></thead><tbody>`;
 
   open.forEach(item => {
@@ -1715,6 +1708,7 @@ function renderMaintenance(maintRows) {
       ? `<span style="font-size:10px;background:var(--warn-bg,#fff3cd);color:var(--warn,#856404);padding:2px 6px;border-radius:4px;">${item.status}</span>`
       : '<span style="font-size:10px;color:var(--text-light);">no status</span>';
     html += `<tr>
+      <td style="white-space:nowrap;font-weight:600;">${item.loc}</td>
       <td style="white-space:nowrap;">${item.date||'—'}</td>
       <td>${item.equip||'—'}</td>
       <td>${item.desc}</td>
@@ -1740,9 +1734,9 @@ function renderFlags(labor, weekly, deepDive, pl) {
   // Data staleness
   if(latest){const d=new Date(latest),now=new Date();if((now-d)/(1000*60*60*24)>14)add('warning','🕐',`Data may be stale — latest week in sheet is <strong>${latest}</strong>.`);}
 
-  // Missing order data
-  if(weekly.amOrders===0||weekly.amOrders===null) add('error','⚠','Lunch orders are <strong>zero</strong> — possible Toast sync issue.');
-  if(weekly.pmOrders===0||weekly.pmOrders===null) add('error','⚠','Dinner orders are <strong>zero</strong> — possible Toast sync issue.');
+  // Missing order data (only flag explicit zero, not null/missing)
+  if(weekly.amOrders===0) add('error','⚠','Lunch orders are <strong>zero</strong> — possible Toast sync issue.');
+  if(weekly.pmOrders===0) add('error','⚠','Dinner orders are <strong>zero</strong> — possible Toast sync issue.');
 
   // Days with zero sales or zero labor
   if(labor.days){
@@ -1847,7 +1841,7 @@ function renderFlags(labor, weekly, deepDive, pl) {
 
 // ── RENDER EXEC SUMMARY ──────────────────────────────────────────────────────
 function renderExecSummary() {
-  const amHrs=5, pmHrs=7, days7=7;
+  const amHrs=5, pmHrs=5, days7=7;  // 5 hrs/period/day × 7 days = 70 hrs total (matches P&L methodology)
 
   function buildLocMetrics(locKey, labelId) {
     const locLabel = locKey==='soho'?'SoHo':'Union Square';
@@ -1856,7 +1850,31 @@ function renderExecSummary() {
     const labor = parseLaborTab(laborRows);
     const pl = parsePLData(raw.plData?.[locLabel]||[]);
 
-    const sales         = pl.netSales || labor.weekSales || weekly.netSales;
+    // P&L History fallback (same as renderAll)
+    if (!pl.netSales) {
+      const histRows = (raw.plHistData?.[locLabel] || []);
+      if (histRows.length > 1) {
+        const locRows = histRows.slice(1)
+          .filter(r => r[2] === locLabel)
+          .sort((a, b) => (a[1]||a[0]) > (b[1]||b[0]) ? 1 : -1);
+        if (locRows.length) {
+          const r = locRows[locRows.length - 1];
+          pl.netSales    = pN(r[3]);
+          pl.foodCogs    = pN(r[4]);
+          pl.bevCogs     = (pN(r[5])||0) + (pN(r[6])||0) || null;
+          pl.paperGoods  = pN(r[7]);
+          pl.totalCogs   = pN(r[8]);
+          pl.cogsPct     = pN(r[24]);
+          pl.totalHourly = pN(r[15]);
+          pl.totalLabor  = pN(r[19]);
+          pl.laborPct    = pN(r[25]);
+          pl.ebitda      = pN(r[23]);
+          pl.ebitdaPct   = pN(r[26]);
+        }
+      }
+    }
+
+    const sales         = weekly.netSales || pl.netSales || labor.weekSales;
     const laborAmt      = pl.totalHourly || labor.weekLabor;
     const totalLaborAmt = pl.totalLabor || null;
     const cogsAmt       = pl.totalCogs || weekly.totalCogs;
@@ -2055,7 +2073,33 @@ function renderAll(){
   const deepDive=raw.deepDive||{weeks:[],byLoc:{'SoHo':{},'Union Square':{}}};
   const menu=(loc==='soho' ? raw.menuBySoho : raw.menuByUsq)||{sections:{}};
   const pl=parsePLData(raw.plData?.[locLabel]||[]);
-  const maintRows=raw.maintData?.[loc]||[];
+
+  // If P&L Data tab is empty this week, fall back to most recent P&L History row
+  if (!pl.netSales) {
+    const histRows = (raw.plHistData?.[locLabel] || []);
+    if (histRows.length > 1) {
+      const locRows = histRows.slice(1)
+        .filter(r => r[2] === locLabel)
+        .sort((a, b) => (a[1]||a[0]) > (b[1]||b[0]) ? 1 : -1);
+      if (locRows.length) {
+        const r = locRows[locRows.length - 1];
+        pl.netSales    = pN(r[3]);
+        pl.foodCogs    = pN(r[4]);
+        pl.bevCogs     = (pN(r[5])||0) + (pN(r[6])||0) || null; // nav_bev + alc
+        pl.paperGoods  = pN(r[7]);
+        pl.totalCogs   = pN(r[8]);
+        pl.cogsPct     = pN(r[24]);
+        pl.totalHourly = pN(r[15]);
+        pl.totalLabor  = pN(r[19]);
+        pl.laborPct    = pN(r[25]);
+        pl.ebitda      = pN(r[23]);
+        pl.ebitdaPct   = pN(r[26]);
+        pl._histWk     = r[1] || r[0]; // week_end date label
+      }
+    }
+  }
+
+  const maintRows=raw.maintData||{};
 
   // Store week end date for KPI quarter detection
   raw.plWeekEnd = pl.netSales ? (raw.plWeekEndStr||null) : null;
@@ -2070,7 +2114,7 @@ function renderAll(){
   renderExecSummary();
   renderSummary(labor, weekly, pl);
   renderDiscounts(weekly);
-  renderLaborDetail(labor);
+  renderLaborDetail(labor, pl);
   renderCogs(weekly, menu, pl);
   renderEfficiency(deepDive);
   renderTrends(deepDive, pl);
@@ -2147,6 +2191,22 @@ async function init(){
     if (plUsqTab) plData['Union Square'] = await getRows(SHEETS.cogs, plUsqTab);
   } catch(e) { console.warn('USQ P&L Data:', e.message); }
 
+  // ── P&L History (fallback when P&L Data tab is empty this week) ──────────────
+  // Cols: week_start(0) week_end(1) location(2) net_sales(3) food(4) nav_bev(5)
+  //   alc(6) paper(7) total_cogs(8) seafood(9) beef(10) poultry(11) pork(12)
+  //   liquor(13) beer(14) total_hourly(15) mgmt_wages(16) commissary(17)
+  //   benefits(18) total_labor(19) total_opex(20) utilities(21) occupancy(22)
+  //   ebitda(23) cogs_pct(24) labor_pct(25) ebitda_pct(26)
+  const plHistData = {};
+  try {
+    const plSohoHistTab = laborTabs.find(t => t === 'P&L History');
+    if (plSohoHistTab) plHistData['SoHo'] = await getRows(SHEETS.labor, plSohoHistTab);
+  } catch(e) { console.warn('SoHo P&L History:', e.message); }
+  try {
+    const plUsqHistTab = cogsTabs.find(t => t === 'P&L History');
+    if (plUsqHistTab) plHistData['Union Square'] = await getRows(SHEETS.cogs, plUsqHistTab);
+  } catch(e) { console.warn('USQ P&L History:', e.message); }
+
   // ── Maintenance logs ────────────────────────────────────────────────────────
   const maintData = {};
   try {
@@ -2181,6 +2241,7 @@ async function init(){
     laborHistory: parseHistory(laborHistoryRows),
     cogsHistory:  parseHistory(cogsHistoryRows),
     plData,
+    plHistData,
     maintData,
   };
 
