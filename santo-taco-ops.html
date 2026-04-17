@@ -2116,16 +2116,24 @@ function renderAll(){
     pl._histWk     = r[1] || r[0];
   }
 
-  // Override priorNetSales from P&L History — the P&L Data "PRIOR WEEK $" for net sales
-  // holds partial current-week data (from the column swap in pl_report.py), not true prior week.
-  // Ingredient-level priors (beef, pork, etc.) are left as-is from parsePLData since they
-  // correctly reflect what the R365 email labels as "last week."
+  // Override all prior-week values from P&L History (second-to-last completed week).
+  // P&L History cols: week_start(0) week_end(1) location(2) net_sales(3) food(4)
+  //   nav_bev(5) alc(6) paper(7) total_cogs(8) seafood(9) beef(10) poultry(11)
+  //   pork(12) liquor(13) beer(14) total_hourly(15) mgmt_wages(16) commissary(17)
+  //   benefits(18) total_labor(19) opex(20) utilities(21) occupancy(22) ebitda(23)
+  //   cogs_pct(24) labor_pct(25) ebitda_pct(26)
   if (plHistSorted.length >= 2) {
     const pr = plHistSorted[plHistSorted.length - 2];
-    pl.priorNetSales  = pN(pr[3]) || pl.priorNetSales;
-    pl.priorTotalCogs = pN(pr[8]) || pl.priorTotalCogs;
-    pl.priorTotalLabor= pN(pr[19])|| pl.priorTotalLabor;
-    pl.priorEbitda    = pN(pr[23])|| pl.priorEbitda;
+    pl.priorNetSales    = pN(pr[3])  || pl.priorNetSales;
+    pl.priorTotalCogs   = pN(pr[8])  || pl.priorTotalCogs;
+    pl.priorSeafoodCost = pN(pr[9])  || pl.priorSeafoodCost;
+    pl.priorBeefCost    = pN(pr[10]) || pl.priorBeefCost;
+    pl.priorPoultryCost = pN(pr[11]) || pl.priorPoultryCost;
+    pl.priorPorkCost    = pN(pr[12]) || pl.priorPorkCost;
+    pl.priorLiquorCost  = pN(pr[13]) || pl.priorLiquorCost;
+    pl.priorBeerCost    = pN(pr[14]) || pl.priorBeerCost;
+    pl.priorTotalLabor  = pN(pr[19]) || pl.priorTotalLabor;
+    pl.priorEbitda      = pN(pr[23]) || pl.priorEbitda;
   }
 
   const maintRows=raw.maintData||{};
