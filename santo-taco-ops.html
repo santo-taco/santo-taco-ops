@@ -1566,9 +1566,9 @@ function renderTrends(deepDive, pl) {
     { key:'beerCost',     prior:'priorBeerCost',    label:'Beer' },
   ];
   const ns = pl.netSales || 1;
-  // Sort by this-week spend descending (nulls last)
+  // Sort by this-week (in-progress) spend descending (nulls last)
   cats.sort((a,b)=>{
-    const av=pl[a.key]??-Infinity, bv=pl[b.key]??-Infinity;
+    const av=pl[a.prior]??-Infinity, bv=pl[b.prior]??-Infinity;
     return bv-av;
   });
   let tHtml=`<div class="spikes-label" style="margin-top:16px;">Category spend — R365 P&L</div>
@@ -1576,18 +1576,21 @@ function renderTrends(deepDive, pl) {
     <th>Category</th><th class="r">This week $</th><th class="r">% of sales</th><th class="r">Prior week $</th><th class="r">WoW</th>
   </tr></thead><tbody>`;
   cats.forEach(({key,prior,label})=>{
-    const curr=pl[key], priorVal=pl[prior];
-    if(curr===null&&priorVal===null){tHtml+=`<tr><td>${label}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`;return;}
-    const pct=curr&&ns?curr/ns:null;
+    // pl[prior] = P&L Data "PRIOR WEEK $" = current in-progress week (R365 Actual col after swap)
+    // pl[key]   = P&L Data "THIS WEEK $"  = just-completed week (R365 Prior col after swap)
+    // Display: "This week" = current in-progress, "Prior week" = just-completed
+    const thisWk=pl[prior], lastWk=pl[key];
+    if(thisWk===null&&lastWk===null){tHtml+=`<tr><td>${label}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`;return;}
+    const pct=thisWk&&ns?thisWk/ns:null;
     let wow='—', wowCls='';
-    if(curr!==null&&priorVal!==null&&priorVal!==0){
-      const chg=(curr-priorVal)/Math.abs(priorVal);
+    if(thisWk!==null&&lastWk!==null&&lastWk!==0){
+      const chg=(thisWk-lastWk)/Math.abs(lastWk);
       const sign=chg>=0?'+':'';
       wow=`${sign}${(chg*100).toFixed(1)}%`;
       if(chg>0.10) wowCls='style="color:var(--red);font-weight:600;"';
       else if(chg<-0.10) wowCls='style="color:var(--green-dark);font-weight:600;"';
     }
-    tHtml+=`<tr><td>${label}</td><td class="r">${curr!==null?f$(curr,2):'—'}</td><td class="r">${pct!==null?fP(pct):'—'}</td><td class="r">${priorVal!==null?f$(priorVal,2):'—'}</td><td class="r" ${wowCls}>${wow}</td></tr>`;
+    tHtml+=`<tr><td>${label}</td><td class="r">${thisWk!==null?f$(thisWk,2):'—'}</td><td class="r">${pct!==null?fP(pct):'—'}</td><td class="r">${lastWk!==null?f$(lastWk,2):'—'}</td><td class="r" ${wowCls}>${wow}</td></tr>`;
   });
   tHtml+='</tbody></table>';
   document.getElementById('ingredient-spend').innerHTML=tHtml;
@@ -1814,7 +1817,8 @@ function renderFlags(labor, weekly, deepDive, pl) {
     {curr:'beerCost',    prior:'priorBeerCost',    label:'Beer'},
   ];
   catSpikes.forEach(({curr,prior,label})=>{
-    const vL=pl[curr], vP=pl[prior];
+    // Match table convention: pl[prior] = current in-progress week, pl[curr] = last completed week
+    const vL=pl[prior], vP=pl[curr];
     if(vL===null||vP===null||vP===0)return;
     const c=(vL-vP)/Math.abs(vP);
     if(c>0.10){
@@ -2116,24 +2120,16 @@ function renderAll(){
     pl._histWk     = r[1] || r[0];
   }
 
-  // Override all prior-week values from P&L History (second-to-last completed week).
-  // P&L History cols: week_start(0) week_end(1) location(2) net_sales(3) food(4)
-  //   nav_bev(5) alc(6) paper(7) total_cogs(8) seafood(9) beef(10) poultry(11)
-  //   pork(12) liquor(13) beer(14) total_hourly(15) mgmt_wages(16) commissary(17)
-  //   benefits(18) total_labor(19) opex(20) utilities(21) occupancy(22) ebitda(23)
-  //   cogs_pct(24) labor_pct(25) ebitda_pct(26)
+  // Override net-level priors from P&L History (second-to-last completed week row).
+  // Ingredient-level priors (beef, pork, etc.) come directly from P&L Data
+  // "PRIOR WEEK $" column, which after the pl_report.py column swap holds the
+  // current in-progress week's spend — displayed as "This week" in the table.
   if (plHistSorted.length >= 2) {
     const pr = plHistSorted[plHistSorted.length - 2];
-    pl.priorNetSales    = pN(pr[3])  || pl.priorNetSales;
-    pl.priorTotalCogs   = pN(pr[8])  || pl.priorTotalCogs;
-    pl.priorSeafoodCost = pN(pr[9])  || pl.priorSeafoodCost;
-    pl.priorBeefCost    = pN(pr[10]) || pl.priorBeefCost;
-    pl.priorPoultryCost = pN(pr[11]) || pl.priorPoultryCost;
-    pl.priorPorkCost    = pN(pr[12]) || pl.priorPorkCost;
-    pl.priorLiquorCost  = pN(pr[13]) || pl.priorLiquorCost;
-    pl.priorBeerCost    = pN(pr[14]) || pl.priorBeerCost;
-    pl.priorTotalLabor  = pN(pr[19]) || pl.priorTotalLabor;
-    pl.priorEbitda      = pN(pr[23]) || pl.priorEbitda;
+    pl.priorNetSales  = pN(pr[3])  || pl.priorNetSales;
+    pl.priorTotalCogs = pN(pr[8])  || pl.priorTotalCogs;
+    pl.priorTotalLabor= pN(pr[19]) || pl.priorTotalLabor;
+    pl.priorEbitda    = pN(pr[23]) || pl.priorEbitda;
   }
 
   const maintRows=raw.maintData||{};
