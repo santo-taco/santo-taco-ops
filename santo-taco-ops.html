@@ -923,7 +923,7 @@ function parsePLData(rows) {
 
 // ── RENDER SUMMARY ────────────────────────────────────────────────────────────
 function renderSummary(labor, weekly, pl) {
-  const sales     = weekly.netSales || pl.netSales || labor.weekSales;
+  const sales     = pl.netSales || weekly.netSales || labor.weekSales;
   const laborAmt  = pl.totalHourly || labor.weekLabor;
   const totalLaborAmt = pl.totalLabor || labor.totalLabor || laborAmt;
   const cogsAmt   = pl.totalCogs || weekly.totalCogs;
@@ -1874,7 +1874,7 @@ function renderExecSummary() {
       }
     }
 
-    const sales         = weekly.netSales || pl.netSales || labor.weekSales;
+    const sales         = pl.netSales || weekly.netSales || labor.weekSales;
     const laborAmt      = pl.totalHourly || labor.weekLabor;
     const totalLaborAmt = pl.totalLabor || null;
     const cogsAmt       = pl.totalCogs || weekly.totalCogs;
