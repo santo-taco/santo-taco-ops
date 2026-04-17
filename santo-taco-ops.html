@@ -490,9 +490,14 @@ body {
 
   <!-- S3: EFFICIENCY -->
   <div class="section">
-    <div class="section-header"><div><div class="section-title">Efficiency</div><div class="section-date" id="eff-date"></div></div></div>
+    <div class="section-header">
+      <div><div class="section-title">Efficiency</div><div class="section-date" id="eff-date"></div></div>
+      <button class="toggle-btn" id="eff-btn" onclick="toggleEff()">Show efficiency</button>
+    </div>
     <div class="section-body" style="padding:0;">
-      <div id="eff-wrap"><div class="loading" style="padding:22px 18px;"><div class="spinner"></div>Loading…</div></div>
+      <div id="eff-body" style="display:none;">
+        <div id="eff-wrap"><div class="loading" style="padding:22px 18px;"><div class="spinner"></div>Loading…</div></div>
+      </div>
     </div>
   </div>
 
@@ -607,6 +612,7 @@ let dailyChart = null;
 let trendCharts = {};
 let dailyOpen = false;
 let menuOpen  = false;
+let effOpen   = false;
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 const pN = v => { if(v===null||v===undefined||v==='')return null; const n=parseFloat(String(v).replace(/[$,%\s]/g,'')); return isNaN(n)?null:n; };
@@ -2055,6 +2061,13 @@ function toggleMenu(){
   const btn=document.getElementById('menu-btn');
   btn.classList.toggle('active',menuOpen);
   btn.textContent=menuOpen?'Hide menu breakdown':'Show menu breakdown';
+}
+function toggleEff(){
+  effOpen=!effOpen;
+  document.getElementById('eff-body').style.display=effOpen?'block':'none';
+  const btn=document.getElementById('eff-btn');
+  btn.classList.toggle('active',effOpen);
+  btn.textContent=effOpen?'Hide efficiency':'Show efficiency';
 }
 
 // ── LOCATION SWITCH ───────────────────────────────────────────────────────────
