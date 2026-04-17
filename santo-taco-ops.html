@@ -1822,16 +1822,20 @@ function renderFlags(labor, weekly, deepDive, pl) {
     }
   });
 
-  // Efficiency flags — <80% or >120%
+  // Efficiency flags — <80% or >120% (one flag per group, combined across keys)
   if(latest){
-    wl.forEach(({name})=>{
-      const data=items[name];
-      if(!data)return;
-      const eff=data.metrics?.['Efficiency %']?.[latest]??null;
-      if(eff===null)return;
-      const displayName = EFF_GROUPS[loc]?.find(g=>g.keys.includes(name))?.label || name;
-      if(eff<0.80) add('error','📉',`<strong>${displayName}</strong> efficiency <strong>${fP(eff)}</strong> — below 80%.`);
-      else if(eff>1.20) add('warning','📈',`<strong>${displayName}</strong> efficiency <strong>${fP(eff)}</strong> — above 120%.`);
+    (EFF_GROUPS[loc]||[]).forEach(({label, keys})=>{
+      let theoTotal=0, actTotal=0, hasData=false;
+      keys.forEach(k=>{
+        const d=items[k]; if(!d) return;
+        const act=d.metrics?.['Actual Qty']?.[latest]??null;
+        const theo=d.metrics?.['Theo Qty']?.[latest]??null;
+        if(act!==null&&theo!==null&&theo>0){ actTotal+=act; theoTotal+=theo; hasData=true; }
+      });
+      if(!hasData||theoTotal===0) return;
+      const eff=actTotal/theoTotal;
+      if(eff<0.80) add('error','📉',`<strong>${label}</strong> efficiency <strong>${fP(eff)}</strong> — below 80%.`);
+      else if(eff>1.20) add('warning','📈',`<strong>${label}</strong> efficiency <strong>${fP(eff)}</strong> — above 120%.`);
     });
   }
 
