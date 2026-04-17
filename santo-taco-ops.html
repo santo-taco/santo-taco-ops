@@ -2090,29 +2090,48 @@ function renderAll(){
   const menu=(loc==='soho' ? raw.menuBySoho : raw.menuByUsq)||{sections:{}};
   const pl=parsePLData(raw.plData?.[locLabel]||[]);
 
+  // Build sorted P&L History rows for this location (used for fallback + prior week)
+  const plHistSorted = (() => {
+    const histRows = raw.plHistData?.[locLabel] || [];
+    if (histRows.length < 2) return [];
+    return histRows.slice(1)
+      .filter(r => r[2] === locLabel)
+      .sort((a, b) => (a[1]||a[0]) > (b[1]||b[0]) ? 1 : -1);
+  })();
+
   // If P&L Data tab is empty this week, fall back to most recent P&L History row
-  if (!pl.netSales) {
-    const histRows = (raw.plHistData?.[locLabel] || []);
-    if (histRows.length > 1) {
-      const locRows = histRows.slice(1)
-        .filter(r => r[2] === locLabel)
-        .sort((a, b) => (a[1]||a[0]) > (b[1]||b[0]) ? 1 : -1);
-      if (locRows.length) {
-        const r = locRows[locRows.length - 1];
-        pl.netSales    = pN(r[3]);
-        pl.foodCogs    = pN(r[4]);
-        pl.bevCogs     = (pN(r[5])||0) + (pN(r[6])||0) || null; // nav_bev + alc
-        pl.paperGoods  = pN(r[7]);
-        pl.totalCogs   = pN(r[8]);
-        pl.cogsPct     = pN(r[24]);
-        pl.totalHourly = pN(r[15]);
-        pl.totalLabor  = pN(r[19]);
-        pl.laborPct    = pN(r[25]);
-        pl.ebitda      = pN(r[23]);
-        pl.ebitdaPct   = pN(r[26]);
-        pl._histWk     = r[1] || r[0]; // week_end date label
-      }
-    }
+  if (!pl.netSales && plHistSorted.length) {
+    const r = plHistSorted[plHistSorted.length - 1];
+    pl.netSales    = pN(r[3]);
+    pl.foodCogs    = pN(r[4]);
+    pl.bevCogs     = (pN(r[5])||0) + (pN(r[6])||0) || null;
+    pl.paperGoods  = pN(r[7]);
+    pl.totalCogs   = pN(r[8]);
+    pl.cogsPct     = pN(r[24]);
+    pl.totalHourly = pN(r[15]);
+    pl.totalLabor  = pN(r[19]);
+    pl.laborPct    = pN(r[25]);
+    pl.ebitda      = pN(r[23]);
+    pl.ebitdaPct   = pN(r[26]);
+    pl._histWk     = r[1] || r[0];
+  }
+
+  // Always override prior-week fields from P&L History (second-to-last completed row).
+  // The P&L Data tab's "PRIOR WEEK $" column is unreliable — when R365 sends the email
+  // mid-week, pl_report.py column-swaps and "prior" ends up holding the current
+  // in-progress partial week, not the true prior completed week.
+  if (plHistSorted.length >= 2) {
+    const pr = plHistSorted[plHistSorted.length - 2];
+    pl.priorNetSales    = pN(pr[3]);
+    pl.priorTotalCogs   = pN(pr[8]);
+    pl.priorSeafoodCost = pN(pr[9]);
+    pl.priorBeefCost    = pN(pr[10]);
+    pl.priorPoultryCost = pN(pr[11]);
+    pl.priorPorkCost    = pN(pr[12]);
+    pl.priorLiquorCost  = pN(pr[13]);
+    pl.priorBeerCost    = pN(pr[14]);
+    pl.priorTotalLabor  = pN(pr[19]);
+    pl.priorEbitda      = pN(pr[23]);
   }
 
   const maintRows=raw.maintData||{};
