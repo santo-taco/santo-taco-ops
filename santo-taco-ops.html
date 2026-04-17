@@ -1579,18 +1579,18 @@ function renderTrends(deepDive, pl) {
     // pl[prior] = P&L Data "PRIOR WEEK $" = current in-progress week (R365 Actual col after swap)
     // pl[key]   = P&L Data "THIS WEEK $"  = just-completed week (R365 Prior col after swap)
     // Display: "This week" = current in-progress, "Prior week" = just-completed
-    const thisWk=pl[prior], lastWk=pl[key];
-    if(thisWk===null&&lastWk===null){tHtml+=`<tr><td>${label}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`;return;}
+    const thisWk=pl[prior]??0, lastWk=pl[key]??0;
+    if(pl[prior]===null&&pl[key]===null){tHtml+=`<tr><td>${label}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`;return;}
     const pct=thisWk&&ns?thisWk/ns:null;
     let wow='—', wowCls='';
-    if(thisWk!==null&&lastWk!==null&&lastWk!==0){
+    if(lastWk!==0){
       const chg=(thisWk-lastWk)/Math.abs(lastWk);
       const sign=chg>=0?'+':'';
       wow=`${sign}${(chg*100).toFixed(1)}%`;
       if(chg>0.10) wowCls='style="color:var(--red);font-weight:600;"';
       else if(chg<-0.10) wowCls='style="color:var(--green-dark);font-weight:600;"';
     }
-    tHtml+=`<tr><td>${label}</td><td class="r">${thisWk!==null?f$(thisWk,2):'—'}</td><td class="r">${pct!==null?fP(pct):'—'}</td><td class="r">${lastWk!==null?f$(lastWk,2):'—'}</td><td class="r" ${wowCls}>${wow}</td></tr>`;
+    tHtml+=`<tr><td>${label}</td><td class="r">${f$(thisWk,2)}</td><td class="r">${pct!==null?fP(pct):'—'}</td><td class="r">${f$(lastWk,2)}</td><td class="r" ${wowCls}>${wow}</td></tr>`;
   });
   tHtml+='</tbody></table>';
   document.getElementById('ingredient-spend').innerHTML=tHtml;
