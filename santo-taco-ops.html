@@ -934,7 +934,8 @@ function renderSummary(labor, weekly, pl) {
   const totalLaborAmt = pl.totalLabor || labor.totalLabor || laborAmt;
   const cogsAmt   = pl.totalCogs || weekly.totalCogs;
   const cogsPct   = pl.cogsPct || (sales&&cogsAmt?cogsAmt/sales:null);
-  const laborPct  = pl.laborPct || labor.laborPct || (sales&&laborAmt?laborAmt/sales:null);
+  const hourlyLaborPct = sales&&laborAmt ? laborAmt/sales : null;
+  const totalLaborPct  = pl.laborPct || (sales&&totalLaborAmt?totalLaborAmt/sales:null) || labor.laborPct;
   const prime     = (totalLaborAmt||0)+(cogsAmt||0);
   const primePct  = sales?prime/sales:null;
 
@@ -974,8 +975,8 @@ function renderSummary(labor, weekly, pl) {
     {label:'Total Sales',      value:f$(sales),                           rawSub: wowSub(sales, lastWkSales, false)},
     {label:'Orders / hr',      value:ophDay||'—',                         sub: totalOrders>0?totalOrders+' total orders':null},
     {label:'Avg Check',        value:avgCheck||'—'},
-    {label:'Hourly Labor',     value:f$(laborAmt),                        rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: laborPct?fP(laborPct)+' of sales'+(histNote?' · '+histNote:''):null},
-    {label:'Total Labor Cost', value:totalLaborAmt?f$(totalLaborAmt):'—', sub: totalLaborAmt&&sales?fP(totalLaborAmt/sales)+' of sales'+(histNote?' · '+histNote:''):(laborAmt?'(hourly only · 7shifts)':'Source: R365 P&L')},
+    {label:'Hourly Labor',     value:f$(laborAmt),                        rawSub: wowSub(laborAmt, lastWkLabor, true), sub2: hourlyLaborPct?fP(hourlyLaborPct)+' of sales'+(histNote?' · '+histNote:''):null},
+    {label:'Total Labor Cost', value:totalLaborAmt?f$(totalLaborAmt):'—', sub: totalLaborPct?fP(totalLaborPct)+' of sales'+(histNote?' · '+histNote:''):(laborAmt?'(hourly only · 7shifts)':'Source: R365 P&L')},
     {label:'Total COGS',       value:cogsPct!==null?fP(cogsPct):'—',      sub:cogsAmt?f$(cogsAmt,2)+(histNote?' · '+histNote:''):null},
   ];
 
