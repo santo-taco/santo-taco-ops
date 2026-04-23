@@ -887,7 +887,7 @@ function parsePLData(rows) {
     benefitsTaxes:null, totalLabor:null, laborPct:null,
     ebitda:null, ebitdaPct:null,
     // prior week
-    priorNetSales:null, priorTotalCogs:null, priorTotalLabor:null, priorEbitda:null,
+    priorNetSales:null, priorTotalCogs:null, priorTotalLabor:null, priorTotalHourly:null, priorEbitda:null,
     priorBeefCost:null, priorPoultryCost:null, priorPorkCost:null,
     priorSeafoodCost:null, priorLiquorCost:null, priorBeerCost:null,
   };
@@ -1152,7 +1152,7 @@ function renderLaborDetail(labor, pl) {
   }
 
   // Summary block
-  const wages  = labor.weekLabor;
+  const wages  = pl.totalHourly || labor.weekLabor;
   const wTarget= labor.wageTarget;
   const wStatus= labor.wageStatus || '';
   const wSales = labor.weekSales;
@@ -1168,7 +1168,7 @@ function renderLaborDetail(labor, pl) {
     <div class="labor-summary-item">
       <div class="labor-summary-label">Total Hourly Wages</div>
       <div class="labor-summary-value">${f$(wages,2)}</div>
-      <div class="labor-summary-sub" style="color:var(--text-light);">Prior week: —</div>
+      ${pl&&pl.priorTotalHourly?`<div class="labor-summary-sub" style="color:var(--text-light);">Prior week: ${f$(pl.priorTotalHourly,2)}</div>`:''}
     </div>
     <div class="labor-summary-item">
       <div class="labor-summary-label">Hourly Wage Target</div>
@@ -1178,7 +1178,7 @@ function renderLaborDetail(labor, pl) {
     <div class="labor-summary-item">
       <div class="labor-summary-label">Weekly Sales</div>
       <div class="labor-summary-value">${f$(wSales,2)}</div>
-      <div class="labor-summary-sub" style="color:var(--text-light);">Prior week: —</div>
+      ${pl&&pl.priorNetSales?`<div class="labor-summary-sub" style="color:var(--text-light);">Prior week: ${f$(pl.priorNetSales,2)}</div>`:''}
     </div>
     <div class="labor-summary-item">
       <div class="labor-summary-label">Hourly Labor % of Sales</div>
@@ -1569,7 +1569,7 @@ function renderTrends(deepDive, pl) {
   const ns = pl.netSales || 1;
   // Sort by this-week (in-progress) spend descending (nulls last)
   cats.sort((a,b)=>{
-    const av=pl[a.prior]??-Infinity, bv=pl[b.prior]??-Infinity;
+    const av=pl[a.key]??-Infinity, bv=pl[b.key]??-Infinity;
     return bv-av;
   });
   let tHtml=`<div class="spikes-label" style="margin-top:16px;">Category spend — R365 P&L</div>
@@ -1577,11 +1577,8 @@ function renderTrends(deepDive, pl) {
     <th>Category</th><th class="r">This week $</th><th class="r">% of sales</th><th class="r">Prior week $</th><th class="r">WoW</th>
   </tr></thead><tbody>`;
   cats.forEach(({key,prior,label})=>{
-    // pl[prior] = P&L Data "PRIOR WEEK $" = current in-progress week (R365 Actual col after swap)
-    // pl[key]   = P&L Data "THIS WEEK $"  = just-completed week (R365 Prior col after swap)
-    // Display: "This week" = current in-progress, "Prior week" = just-completed
-    const thisWk=pl[prior]??0, lastWk=pl[key]??0;
-    if(pl[prior]===null&&pl[key]===null){tHtml+=`<tr><td>${label}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`;return;}
+    const thisWk=pl[key]??0, lastWk=pl[prior]??0;
+    if(pl[key]===null&&pl[prior]===null){tHtml+=`<tr><td>${label}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`;return;}
     const pct=thisWk&&ns?thisWk/ns:null;
     let wow='—', wowCls='';
     if(lastWk!==0){
@@ -1901,10 +1898,12 @@ function renderExecSummary() {
     const ophDayE  = totalOrdersE>0 && totalHoursE>0 ? (totalOrdersE/totalHoursE).toFixed(1) : null;
     const avgCheckE= totalOrdersE>0&&sales ? f$(sales/totalOrdersE,2) : null;
 
-    const locHistory = (raw.laborHistory||[]).filter(r=>r[2]===locLabel);
-    const sortedHist = locHistory.sort((a,b)=>a[0]<b[0]?-1:1);
-    const lastWeekRow = sortedHist.length>=2 ? sortedHist[sortedHist.length-2] : null;
-    const lastWeekSales = pl.priorNetSales || (lastWeekRow ? parseFloat(lastWeekRow[3]) : null);
+    const plHistE = (() => {
+      const h = raw.plHistData?.[locLabel] || [];
+      if (h.length < 2) return [];
+      return h.slice(1).filter(r => r[2] === locLabel).sort((a, b) => (a[1]||a[0]) > (b[1]||b[0]) ? 1 : -1);
+    })();
+    const lastWeekSales = plHistE.length >= 2 ? pN(plHistE[plHistE.length - 2][3]) : null;
     let salesSub = null;
     if (lastWeekSales!==null && sales!==null) {
       const diff = sales - lastWeekSales;
@@ -2127,10 +2126,17 @@ function renderAll(){
   // current in-progress week's spend — displayed as "This week" in the table.
   if (plHistSorted.length >= 2) {
     const pr = plHistSorted[plHistSorted.length - 2];
-    pl.priorNetSales  = pN(pr[3])  || pl.priorNetSales;
-    pl.priorTotalCogs = pN(pr[8])  || pl.priorTotalCogs;
-    pl.priorTotalLabor= pN(pr[19]) || pl.priorTotalLabor;
-    pl.priorEbitda    = pN(pr[23]) || pl.priorEbitda;
+    pl.priorNetSales    = pN(pr[3])  || pl.priorNetSales;
+    pl.priorTotalCogs   = pN(pr[8])  || pl.priorTotalCogs;
+    pl.priorTotalHourly = pN(pr[15]) || pl.priorTotalHourly;
+    pl.priorTotalLabor  = pN(pr[19]) || pl.priorTotalLabor;
+    pl.priorEbitda      = pN(pr[23]) || pl.priorEbitda;
+    pl.priorSeafoodCost = pN(pr[9])  || pl.priorSeafoodCost;
+    pl.priorBeefCost    = pN(pr[10]) || pl.priorBeefCost;
+    pl.priorPoultryCost = pN(pr[11]) || pl.priorPoultryCost;
+    pl.priorPorkCost    = pN(pr[12]) || pl.priorPorkCost;
+    pl.priorLiquorCost  = pN(pr[13]) || pl.priorLiquorCost;
+    pl.priorBeerCost    = pN(pr[14]) || pl.priorBeerCost;
   }
 
   const maintRows=raw.maintData||{};
