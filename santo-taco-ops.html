@@ -512,14 +512,16 @@ body {
     </div>
   </div>
 
-  <!-- S7: MAINTENANCE LOG -->
+  <!-- S7: OPERATIONAL EXCELLENCE -->
   <div class="section">
     <div class="section-header">
-      <div><div class="section-title">Maintenance Log</div><div class="section-date" id="maint-date"></div></div>
-      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">OPEN &amp; IN PROGRESS ITEMS · LIVE FROM SHEETS</div>
+      <div><div class="section-title">Operational Excellence</div></div>
     </div>
     <div class="section-body">
+      <div style="font-size:10px;font-weight:600;color:var(--green-dark);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--mint);">Maintenance Log <span style="font-size:9px;font-weight:400;color:var(--text-light);text-transform:none;letter-spacing:0;">· open &amp; in progress items</span></div>
       <div id="maint-content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+      <div style="font-size:10px;font-weight:600;color:var(--green-dark);text-transform:uppercase;letter-spacing:0.07em;margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--mint);">Daily Taste Test <span style="font-size:9px;font-weight:400;color:var(--text-light);text-transform:none;letter-spacing:0;">· current week</span></div>
+      <div id="taste-content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
     </div>
   </div>
 
@@ -546,6 +548,7 @@ const SHEETS   = {
   labor: '1qEh_bnAX9JzvZNKPiUUQt-5Kc6Pk2K6SxRzz9e4gcnk',
   cogs:  '1FmjJqxwxZz4FmosAqC7H2L7S-tTczjzWnUQURaLN7rg',
   menu:  '1dyxWXbuGfCawxUYgO8aJicc34JbDWPp9eTfo1Zh6UaU',
+  taste: '1jI5LrQEUIz5MTUC3eAUv6NEefzjA1jcWkZ-0_z10oyk',
   // P&L Data is written by pl_report.py to the labor sheet (per location tab)
   // and a shared COGS sheet for USQ. Both use the same P&L Data tab name.
 };
@@ -1727,6 +1730,69 @@ function renderMaintenance(maintData) {
   document.getElementById('maint-content').innerHTML = html;
 }
 
+// ── RENDER TASTE TEST ─────────────────────────────────────────────────────────
+function renderTasteTest() {
+  const rows     = raw.tasteTest || [];
+  const locLabel = loc === 'soho' ? 'SoHo' : 'Union Square';
+  const el       = document.getElementById('taste-content');
+
+  // Compute Mon–Sun of current week
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const dow    = today.getDay(); // 0=Sun
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    days.push(d);
+  }
+
+  // Parse submissions: col3=name, col4=date (M/D/YYYY), col34=location
+  // key = YYYY-MM-DD → [name, ...]
+  const submissions = {};
+  rows.slice(1).forEach(r => {
+    const dateStr = (r[4]  || '').toString().trim();
+    const name    = (r[3]  || '').toString().trim();
+    const rowLoc  = (r[34] || '').toString().trim();
+    if (!dateStr || !name) return;
+    if (rowLoc && rowLoc !== locLabel) return;
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return;
+    const d = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+    d.setHours(0,0,0,0);
+    const key = d.toISOString().slice(0, 10);
+    if (!submissions[key]) submissions[key] = [];
+    if (!submissions[key].includes(name)) submissions[key].push(name);
+  });
+
+  const DOWS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let html = '<table class="eff-table"><thead><tr><th>Day</th><th>Date</th><th style="text-align:center;">Done</th><th>Submitted by</th></tr></thead><tbody>';
+
+  days.forEach((d, i) => {
+    const key      = d.toISOString().slice(0, 10);
+    const names    = submissions[key] || [];
+    const isFuture = d > today;
+    const done     = names.length > 0;
+
+    const check = isFuture
+      ? '<span style="color:var(--text-light);">—</span>'
+      : done
+        ? '<span style="color:var(--green-dark);font-weight:600;">✓</span>'
+        : '<span style="color:var(--red);font-weight:600;">✗</span>';
+    const by = done
+      ? names.join(', ')
+      : isFuture ? '' : '<span style="color:var(--text-light);">not submitted</span>';
+
+    html += `<tr><td>${DOWS[i]}</td><td>${(d.getMonth()+1)}/${d.getDate()}</td><td style="text-align:center;">${check}</td><td>${by}</td></tr>`;
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
 // ── RENDER FLAGS ──────────────────────────────────────────────────────────────
 function renderFlags(labor, weekly, deepDive, pl) {
   const flags=[];
@@ -2160,6 +2226,7 @@ function renderAll(){
   renderTrends(deepDive, pl);
   renderKPI(pl);
   renderMaintenance(maintRows);
+  renderTasteTest();
   renderFlags(labor, weekly, deepDive, pl);
 
   // Populate section date ranges
@@ -2247,6 +2314,14 @@ async function init(){
     if (plUsqHistTab) plHistData['Union Square'] = await getRows(SHEETS.cogs, plUsqHistTab);
   } catch(e) { console.warn('USQ P&L History:', e.message); }
 
+  // ── Taste test responses ────────────────────────────────────────────────────
+  let tasteRows = [];
+  try {
+    const tasteTabs = await getTabs(SHEETS.taste);
+    const tasteTab  = tasteTabs.find(t => /form.responses/i.test(t)) || tasteTabs[0];
+    if (tasteTab) tasteRows = await getRows(SHEETS.taste, tasteTab);
+  } catch(e) { console.warn('Taste test:', e.message); }
+
   // ── Maintenance logs ────────────────────────────────────────────────────────
   const maintData = {};
   try {
@@ -2283,6 +2358,7 @@ async function init(){
     plData,
     plHistData,
     maintData,
+    tasteTest: tasteRows,
   };
 
   // Show any critical errors at top but still try to render
@@ -2300,7 +2376,7 @@ async function init(){
     console.error('renderAll failed:', err);
     const msg = err.message || String(err);
     const e = `<div class="error-state">⚠ Render error: ${msg}</div>`;
-    ['summary-cards','cogs-cards','eff-wrap','trends-content','flags-body','kpi-content','maint-content'].forEach(id => {
+    ['summary-cards','cogs-cards','eff-wrap','trends-content','flags-body','kpi-content','maint-content','taste-content'].forEach(id => {
       const el = document.getElementById(id); if (el && el.innerHTML.includes('Loading')) el.innerHTML = e;
     });
   }
