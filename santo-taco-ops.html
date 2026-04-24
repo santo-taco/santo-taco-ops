@@ -479,7 +479,7 @@ body {
   <div class="section">
     <div class="section-header">
       <div><div class="section-title">Ingredient Pricing Trends</div><div class="section-date" id="trends-date"></div></div>
-      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">LAST 12 WEEKS · COST / UNIT · AVT SOURCE</div>
+      <div style="font-size:9px;color:var(--text-light);letter-spacing:0.07em;">LAST 8 WEEKS · COST / UNIT · AVT SOURCE</div>
     </div>
     <div class="section-body">
       <div id="trends-content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
@@ -1448,7 +1448,7 @@ function renderTrends(deepDive, pl) {
 
   const locLabel=loc==='soho'?'SoHo':'Union Square';
   const items=deepDive.byLoc[locLabel]||{};
-  const weeks=deepDive.weeks.slice(-12);
+  const weeks=deepDive.weeks.slice(-8);
   const wkLabels=weeks.map(w=>w.slice(5));
 
   // For USQ, map standardized keys to actual AVT ingredient names
