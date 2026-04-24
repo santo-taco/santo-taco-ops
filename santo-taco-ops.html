@@ -1757,13 +1757,15 @@ function renderTasteTest(labor) {
 
   // Parse submissions: col3=name, col4=date (M/D/YYYY), col34=location
   // key = YYYY-MM-DD → [name, ...]
+  const locMatch = loc === 'soho' ? 'soho' : 'union';
+  console.log('[taste] rows:', rows.length, 'locLabel:', locLabel, 'locMatch:', locMatch);
   const submissions = {};
   rows.slice(1).forEach(r => {
     const dateStr = (r[4]  || '').toString().trim();
     const name    = (r[3]  || '').toString().trim();
-    const rowLoc  = (r[34] || '').toString().trim();
+    const rowLoc  = (r[34] || '').toString().trim().toLowerCase();
     if (!dateStr || !name) return;
-    if (rowLoc && rowLoc !== locLabel) return;
+    if (rowLoc && !rowLoc.includes(locMatch)) return;
     const parts = dateStr.split('/');
     if (parts.length !== 3) return;
     const d = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
@@ -1773,6 +1775,7 @@ function renderTasteTest(labor) {
     if (!submissions[key].includes(name)) submissions[key].push(name);
   });
 
+  console.log('[taste] submissions found:', JSON.stringify(submissions));
   const DOWS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   let html = '<table class="eff-table"><thead><tr><th>Day</th><th>Date</th><th style="text-align:center;">Done</th><th>Submitted by</th></tr></thead><tbody>';
 
