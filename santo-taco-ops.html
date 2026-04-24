@@ -1980,10 +1980,10 @@ function renderExecTrends() {
   const laborHist = raw.laborHistory || [];
   const cogsHist  = raw.cogsHistory  || [];
 
-  // Get sorted unique week_start dates across both locations
+  // Get sorted unique week_end dates across both locations
   const allWeeks = [...new Set([
-    ...laborHist.map(r=>r[0]),
-    ...cogsHist.map(r=>r[0]),
+    ...laborHist.map(r=>r[1]),
+    ...cogsHist.map(r=>r[1]),
   ])].sort().slice(-8);
 
   if (!allWeeks.length) {
@@ -1992,7 +1992,7 @@ function renderExecTrends() {
     return;
   }
 
-  const wkLabels = allWeeks.map(w=>w.slice(5)); // MM-DD
+  const wkLabels = allWeeks.map(w=>w.slice(5)); // MM-DD (week ending)
 
   // Build datasets per location
   const LOCS = [
@@ -2003,7 +2003,7 @@ function renderExecTrends() {
   function makeDataset(histRows, locKey, colIdx, color) {
     const rows = histRows.filter(r=>r[2]===locKey);
     const byWeek = {};
-    rows.forEach(r=>{ byWeek[r[0]]=parseFloat(r[colIdx])||null; });
+    rows.forEach(r=>{ byWeek[r[1]]=parseFloat(r[colIdx])||null; });
     return {
       label: locKey==='SoHo'?'SoHo':'USQ',
       data: allWeeks.map(w=>byWeek[w]??null),
