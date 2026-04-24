@@ -1742,7 +1742,7 @@ function renderTasteTest(labor) {
 
   let days = [];
   if (labor && labor.days && labor.days.length === 7) {
-    days = labor.days.map(d => { const dt = new Date(d.date); dt.setHours(0,0,0,0); return dt; });
+    days = labor.days.map(d => { const p=d.date.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); });
   } else {
     // fallback: current calendar week
     const dow = today.getDay();
@@ -1772,7 +1772,7 @@ function renderTasteTest(labor) {
     if (parts.length !== 3) return;
     const d = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
     d.setHours(0,0,0,0);
-    const key = d.toISOString().slice(0, 10);
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     if (!submissions[key]) submissions[key] = [];
     if (!submissions[key].includes(name)) submissions[key].push(name);
   });
@@ -1780,7 +1780,7 @@ function renderTasteTest(labor) {
   let html = '<table class="eff-table"><thead><tr><th>Day</th><th>Date</th><th style="text-align:center;">Done</th><th>Submitted by</th></tr></thead><tbody>';
 
   days.forEach((d, i) => {
-    const key   = d.toISOString().slice(0, 10);
+    const key   = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const names = submissions[key] || [];
     const done  = names.length > 0;
 
