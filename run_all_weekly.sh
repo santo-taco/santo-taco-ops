@@ -10,6 +10,11 @@ MAX_ATTEMPTS=5
 RETRY_WAIT=60
 FAILED_SCRIPTS=()
 
+# Rotate log — keep last 2000 lines
+if [ -f "$LOG" ]; then
+    tail -2000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+fi
+
 echo "=======================================" | tee -a "$LOG"
 echo "Weekly run started: $(date)" | tee -a "$LOG"
 echo "=======================================" | tee -a "$LOG"
