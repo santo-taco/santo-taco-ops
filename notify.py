@@ -50,7 +50,7 @@ def send_summary(log_path: str, failed: list[str]) -> None:
     body_lines = [f"Weekly ops run {status}.", ""]
     if failed:
         body_lines += [
-            f"⚠ The following scripts failed after {3} attempts and need to be re-run manually:",
+            f"⚠ The following scripts failed after {5} attempts and need to be re-run manually:",
             *[f"  • {s}" for s in failed],
             "",
         ]

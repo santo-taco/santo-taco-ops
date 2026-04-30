@@ -6,7 +6,7 @@
 DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG="$DIR/weekly_run.log"
 VENV="$DIR/venv/bin/activate"
-MAX_ATTEMPTS=3
+MAX_ATTEMPTS=5
 RETRY_WAIT=60
 FAILED_SCRIPTS=()
 
